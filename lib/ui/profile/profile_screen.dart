@@ -130,10 +130,10 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Conversar com o Ney',
+                      Text('Falar com o Assessor',
                           style: t.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w700)),
-                      Text('Pergunte sobre suas finanças',
+                      Text('IA focada em despesas e entradas',
                           style: t.bodySmall),
                     ],
                   ),

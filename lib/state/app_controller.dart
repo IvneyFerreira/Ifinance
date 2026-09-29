@@ -158,7 +158,7 @@ class AppController extends ChangeNotifier {
     const demoPassword = 'ifinance123';
     if (!auth.emailExists(demoEmail)) {
       final user = await auth.register(
-        name: 'Ney',
+        name: 'Usuário Demo',
         email: demoEmail,
         password: demoPassword,
       );
