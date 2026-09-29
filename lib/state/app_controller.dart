@@ -1,13 +1,19 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/db/hive_db.dart';
 import '../core/db/repository.dart';
+import '../core/db/collection.dart';
 import '../core/finance/finance_engine.dart';
 import '../core/models/models.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/seed_service.dart';
+import '../core/services/statement_importer.dart';
 import '../core/utils/category_icons.dart';
+import '../core/utils/date_helpers.dart';
+import '../core/utils/money.dart';
 
 /// Controlador central de estado do aplicativo.
 /// Mantém a sessão, as coleções do usuário e expõe o FinanceEngine.
@@ -95,6 +101,7 @@ class AppController extends ChangeNotifier {
       await repo.settings.put(_settings);
     }
     _themeMode = _settings.themeMode;
+    Money.setSymbol(_symbolFor(_settings.currency));
 
     accounts = repo.accounts.byUser(uid);
     categories = repo.categories.byUser(uid);
@@ -271,9 +278,16 @@ class AppController extends ChangeNotifier {
 
   Future<void> updateSettings(UserSettings newSettings) async {
     _settings = newSettings;
+    Money.setSymbol(_symbolFor(newSettings.currency));
     if (_user != null) await repo.settings.put(_settings);
     notifyListeners();
   }
+
+  static String _symbolFor(String currency) => switch (currency) {
+        'USD' => 'US\$',
+        'EUR' => '€',
+        _ => 'R\$',
+      };
 
   // ---------------------------------------------------------------------------
   // Contas
@@ -546,6 +560,32 @@ class AppController extends ChangeNotifier {
     await refresh();
   }
 
+  /// Exclui as duas pernas de uma transferência, revertendo o efeito nas contas.
+  Future<void> deleteTransfer(Transaction leg) async {
+    final groupId = leg.transferGroupId;
+    if (groupId == null) {
+      await deleteTransaction(leg);
+      return;
+    }
+    final legs =
+        transactions.where((t) => t.transferGroupId == groupId).toList();
+    final now = DateTime.now();
+    for (final t in legs) {
+      final acc = accountById(t.accountId);
+      if (acc != null) {
+        // Reverte: a perna de saída devolve, a de entrada retira.
+        final sign = t.isIncome ? -1 : 1;
+        await repo.accounts.put(acc.copyWith(
+          balanceCents: acc.balanceCents + t.amountCents * sign,
+          updatedAt: now,
+        ));
+      }
+      await repo.transactions.delete(t.id);
+    }
+    await repo.log(_user!.id, 'transfer_delete', 'Transfer', entityId: groupId);
+    await refresh();
+  }
+
   // ---------------------------------------------------------------------------
   // Cartões e compras
   // ---------------------------------------------------------------------------
@@ -570,10 +610,32 @@ class AppController extends ChangeNotifier {
     String? categoryId,
     DateTime? purchaseDate,
   }) async {
-    final now = DateTime.now();
-    final pDate = purchaseDate ?? now;
     final card = cardById(creditCardId);
     if (card == null) return;
+    await _insertPurchase(
+      creditCardId: creditCardId,
+      description: description,
+      totalCents: totalCents,
+      installmentsCount: installmentsCount,
+      categoryId: categoryId,
+      purchaseDate: purchaseDate ?? DateTime.now(),
+    );
+    await repo.log(_user!.id, 'card_purchase', 'CardPurchase',
+        details: '$totalCents x$installmentsCount');
+    await refresh();
+  }
+
+  /// Insere a compra original e suas transações/parcelas.
+  Future<void> _insertPurchase({
+    required String creditCardId,
+    required String description,
+    required int totalCents,
+    required int installmentsCount,
+    String? categoryId,
+    required DateTime purchaseDate,
+  }) async {
+    final now = DateTime.now();
+    final pDate = purchaseDate;
 
     final purchase = CardPurchase(
       id: repo.newId(),
@@ -642,8 +704,52 @@ class AppController extends ChangeNotifier {
       }
       await repo.installments.putAll(list);
     }
-    await repo.log(_user!.id, 'card_purchase', 'CardPurchase',
-        entityId: purchase.id, details: '$totalCents x$installmentsCount');
+  }
+
+  /// Remove todas as transações e parcelas de uma compra.
+  Future<void> _removePurchaseData(String purchaseId) async {
+    final txs = transactions.where((t) => t.purchaseId == purchaseId).toList();
+    for (final t in txs) {
+      await repo.transactions.delete(t.id);
+    }
+    final insts =
+        installments.where((i) => i.purchaseId == purchaseId).toList();
+    for (final i in insts) {
+      await repo.installments.delete(i.id);
+    }
+  }
+
+  /// Edita uma compra no cartão (reconstrói transações e parcelas).
+  Future<void> updateCardPurchase({
+    required CardPurchase purchase,
+    required int totalCents,
+    required int installmentsCount,
+    String? categoryId,
+    String? creditCardId,
+    String? description,
+    DateTime? purchaseDate,
+  }) async {
+    await _removePurchaseData(purchase.id);
+    await repo.purchases.delete(purchase.id);
+    await _insertPurchase(
+      creditCardId: creditCardId ?? purchase.creditCardId,
+      description: description ?? purchase.description,
+      totalCents: totalCents,
+      installmentsCount: installmentsCount,
+      categoryId: categoryId,
+      purchaseDate: purchaseDate ?? purchase.firstReferenceMonth,
+    );
+    await repo.log(_user!.id, 'card_purchase_update', 'CardPurchase',
+        entityId: purchase.id);
+    await refresh();
+  }
+
+  /// Exclui uma compra no cartão (e suas transações/parcelas).
+  Future<void> deletePurchase(CardPurchase purchase) async {
+    await _removePurchaseData(purchase.id);
+    await repo.purchases.delete(purchase.id);
+    await repo.log(_user!.id, 'card_purchase_delete', 'CardPurchase',
+        entityId: purchase.id);
     await refresh();
   }
 
@@ -865,6 +971,255 @@ class AppController extends ChangeNotifier {
       changed = true;
     }
     if (changed) await refresh();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Exportação / Backup / Restauração (cap. 42/43)
+  // ---------------------------------------------------------------------------
+
+  Map<String, dynamic> _snapshot() => {
+        'user': _user?.toMap(),
+        'settings': _settings.toMap(),
+        'accounts': accounts.map((e) => e.toMap()).toList(),
+        'categories': categories.map((e) => e.toMap()).toList(),
+        'transactions': transactions.map((e) => e.toMap()).toList(),
+        'cards': cards.map((e) => e.toMap()).toList(),
+        'purchases': purchases.map((e) => e.toMap()).toList(),
+        'installments': installments.map((e) => e.toMap()).toList(),
+        'recurringRules': recurringRules.map((e) => e.toMap()).toList(),
+        'subscriptions': subscriptions.map((e) => e.toMap()).toList(),
+        'budgets': budgets.map((e) => e.toMap()).toList(),
+        'goals': goals.map((e) => e.toMap()).toList(),
+        'contributions': contributions.map((e) => e.toMap()).toList(),
+        'assets': assets.map((e) => e.toMap()).toList(),
+        'liabilities': liabilities.map((e) => e.toMap()).toList(),
+        'notifications': notifications.map((e) => e.toMap()).toList(),
+      };
+
+  /// Backup completo (JSON) — inclui todas as coleções + metadados.
+  Map<String, dynamic> exportBackup() => {
+        'app': 'IFinance',
+        'version': 1,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'data': _snapshot(),
+      };
+
+  /// Exporta o backup como texto JSON.
+  String exportBackupJson() =>
+      const JsonEncoder.withIndent('  ').convert(exportBackup());
+
+  /// Exporta as movimentações em CSV (pt-BR, separador ';').
+  String exportTransactionsCsv() {
+    final b = StringBuffer();
+    b.writeln('Data;Tipo;Descricao;Categoria;Conta;Cartao;Valor;Status');
+    for (final t in transactions) {
+      if (t.isTransfer) continue;
+      final cat = categoryById(t.categoryId)?.name ?? '';
+      final acc = accountById(t.accountId)?.name ?? '';
+      final card = cardById(t.creditCardId)?.name ?? '';
+      final tipo = t.isInvoicePayment
+          ? 'Fatura'
+          : (t.isIncome ? 'Receita' : 'Despesa');
+      final valor =
+          '${t.isIncome ? '' : '-'}${(t.amountCents / 100).toStringAsFixed(2)}';
+      b.writeln([
+        DateHelpers.isoDate(t.competenceDate),
+        tipo,
+        _csvEscape(t.description),
+        _csvEscape(cat),
+        _csvEscape(acc),
+        _csvEscape(card),
+        valor.replaceAll('.', ','),
+        t.isPaid ? 'Concluido' : 'Pendente',
+      ].join(';'));
+    }
+    return b.toString();
+  }
+
+  String _csvEscape(String s) =>
+      s.contains(';') || s.contains('"') ? '"${s.replaceAll('"', '""')}"' : s;
+
+  /// Importa lançamentos de um extrato (CSV/OFX) para uma conta.
+  /// Retorna quantos lançamentos foram criados.
+  Future<int> importStatements({
+    required List<ImportedRow> rows,
+    required String accountId,
+    bool asPending = false,
+    bool autoCategory = true,
+  }) async {
+    final uid = _user!.id;
+    final now = DateTime.now();
+    var count = 0;
+    for (final r in rows) {
+      final isIncome = r.amountCents > 0;
+      final abs = r.amountCents.abs();
+      if (abs == 0) continue;
+      final catId = autoCategory
+          ? _bestCategoryFor(r.description, isIncome)
+          : null;
+      final tx = Transaction(
+        id: repo.newId(),
+        userId: uid,
+        accountId: accountId,
+        categoryId: catId,
+        type: isIncome ? TransactionType.income : TransactionType.expense,
+        description: r.description,
+        amountCents: abs,
+        competenceDate: r.date,
+        dueDate: r.date,
+        paidAt: asPending ? null : r.date,
+        expenseStatus: isIncome
+            ? ExpenseStatus.pending
+            : (asPending ? ExpenseStatus.pending : ExpenseStatus.paid),
+        incomeStatus: isIncome
+            ? (asPending ? IncomeStatus.expected : IncomeStatus.received)
+            : IncomeStatus.expected,
+        paymentMethod: PaymentMethod.other,
+        notes: 'Importado de extrato',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await saveTransaction(tx);
+      count++;
+    }
+    await repo.log(uid, 'import', 'Statement', details: '$count lançamentos');
+    await refresh();
+    return count;
+  }
+
+  /// Heurística simples de categorização por palavra-chave na descrição.
+  String? _bestCategoryFor(String description, bool isIncome) {
+    final d = _stripAccents(description.toLowerCase());
+    for (final c in categories.where((c) => c.isIncome == isIncome)) {
+      final name = _stripAccents(c.name.toLowerCase());
+      if (name.length >= 3 && d.contains(name)) return c.id;
+    }
+    final map = <String, List<String>>{
+      'aliment': ['mercado', 'supermerc', 'padaria', 'restaurante', 'lanchonete', 'ifood'],
+      'transport': ['uber', '99', 'posto', 'combust', 'gasolina', 'estacionamento', 'metro'],
+      'moradia': ['aluguel', 'condominio', 'luz', 'energia', 'agua', 'internet'],
+      'saude': ['farmacia', 'farmácia', 'drogaria', 'hospital', 'clinica', 'plano de saude'],
+      'lazer': ['cinema', 'netflix', 'spotify', 'streaming', 'show'],
+      'educacao': ['escola', 'faculdade', 'curso', 'livraria'],
+      'salario': ['salario', 'salário', 'pagamento', 'vencimento', 'proventos'],
+    };
+    for (final entry in map.entries) {
+      if (entry.value.any((k) => d.contains(_stripAccents(k)))) {
+        final match = categories.where((c) =>
+            c.isIncome == isIncome &&
+            _stripAccents(c.name.toLowerCase()).contains(entry.key));
+        if (match.isNotEmpty) return match.first.id;
+      }
+    }
+    return null;
+  }
+
+  static String _stripAccents(String s) => s
+      .replaceAll(RegExp('[áàâãä]'), 'a')
+      .replaceAll(RegExp('[éèêë]'), 'e')
+      .replaceAll(RegExp('[íìîï]'), 'i')
+      .replaceAll(RegExp('[óòôõö]'), 'o')
+      .replaceAll(RegExp('[úùûü]'), 'u')
+      .replaceAll('ç', 'c');
+
+  /// Restaura um backup (substitui os dados do usuário atual).
+  Future<int> restoreBackup(Map<String, dynamic> json) async {
+    final uid = _user!.id;
+    final data = (json['data'] ?? json) as Map<String, dynamic>;
+    int count = 0;
+
+    // Limpa coleções atuais do usuário.
+    for (final box in [
+      repo.accounts,
+      repo.categories,
+      repo.transactions,
+      repo.cards,
+      repo.purchases,
+      repo.installments,
+      repo.recurring,
+      repo.subscriptions,
+      repo.budgets,
+      repo.goals,
+      repo.contributions,
+      repo.assets,
+      repo.liabilities,
+      repo.notifications,
+    ]) {
+      await box.clearUser(uid);
+    }
+
+    Future<void> load<T>(
+      String key,
+      Collection<T> col,
+      T Function(Map<String, dynamic>) fromMap,
+    ) async {
+      final list = (data[key] as List?) ?? const [];
+      for (final raw in list) {
+        await col.put(fromMap(Map<String, dynamic>.from(raw as Map)));
+        count++;
+      }
+    }
+
+    await load('accounts', repo.accounts, Account.fromMap);
+    await load('categories', repo.categories, Category.fromMap);
+    await load('transactions', repo.transactions, Transaction.fromMap);
+    await load('cards', repo.cards, CreditCard.fromMap);
+    await load('purchases', repo.purchases, CardPurchase.fromMap);
+    await load('installments', repo.installments, Installment.fromMap);
+    await load('recurringRules', repo.recurring, RecurringRule.fromMap);
+    await load('subscriptions', repo.subscriptions, Subscription.fromMap);
+    await load('budgets', repo.budgets, Budget.fromMap);
+    await load('goals', repo.goals, Goal.fromMap);
+    await load('contributions', repo.contributions, GoalContribution.fromMap);
+    await load('assets', repo.assets, Asset.fromMap);
+    await load('liabilities', repo.liabilities, Liability.fromMap);
+    await load('notifications', repo.notifications, AppNotification.fromMap);
+
+    // Reaplica as configurações, se houver.
+    final settingsMap = data['settings'];
+    if (settingsMap is Map) {
+      await updateSettings(
+          UserSettings.fromMap(Map<String, dynamic>.from(settingsMap)));
+    }
+
+    await repo.log(uid, 'restore', 'Backup', details: '$count registros');
+    await refresh();
+    return count;
+  }
+
+  /// Redefine os dados financeiros do usuário (mantém a conta e recria categorias).
+  Future<void> resetFinancialData() async {
+    final uid = _user!.id;
+    for (final box in [
+      repo.accounts,
+      repo.categories,
+      repo.transactions,
+      repo.cards,
+      repo.purchases,
+      repo.installments,
+      repo.recurring,
+      repo.subscriptions,
+      repo.budgets,
+      repo.goals,
+      repo.contributions,
+      repo.assets,
+      repo.liabilities,
+      repo.notifications,
+    ]) {
+      await box.clearUser(uid);
+    }
+    await _seedDefaultCategories();
+    await repo.accounts.put(Account(
+      id: repo.newId(),
+      userId: uid,
+      name: 'Conta principal',
+      type: AccountType.checking,
+      balanceCents: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ));
+    await repo.log(uid, 'reset', 'Data');
+    await refresh();
   }
 }
 

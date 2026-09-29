@@ -10,6 +10,10 @@ class DateHelpers {
   static final DateFormat monthLong = DateFormat('MMMM', 'pt_BR');
   static final DateFormat monthYear = DateFormat('MMMM yyyy', 'pt_BR');
   static final DateFormat weekdayShort = DateFormat('EEE', 'pt_BR');
+  static final DateFormat iso = DateFormat('yyyy-MM-dd');
+
+  /// "2026-03-12" (para CSV/backup).
+  static String isoDate(DateTime d) => iso.format(dateOnly(d));
 
   static const List<String> monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../shell/quick_add.dart';
@@ -10,7 +12,9 @@ import 'date_field.dart';
 /// Transferência entre contas próprias (cap. 17). Não é receita nem despesa;
 /// impacto zero no resultado consolidado.
 class TransferFormScreen extends StatefulWidget {
-  const TransferFormScreen({super.key});
+  /// Perna de origem (despesa) da transferência a editar, se houver.
+  final Transaction? editing;
+  const TransferFormScreen({super.key, this.editing});
 
   @override
   State<TransferFormScreen> createState() => _TransferFormScreenState();
@@ -24,12 +28,27 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
   DateTime _date = DateTime.now();
   bool _saving = false;
 
+  bool get _isEditing => widget.editing != null;
+
   @override
   void initState() {
     super.initState();
     final c = context.read<AppController>();
     if (c.accounts.isNotEmpty) _fromId = c.accounts.first.id;
     if (c.accounts.length > 1) _toId = c.accounts[1].id;
+
+    final e = widget.editing;
+    if (e != null) {
+      _amount.text = MoneyInputFormatter.formatCents(e.amountCents);
+      _description.text = e.description;
+      _fromId = e.accountId ?? _fromId;
+      final other = c.transactions.firstWhere(
+        (t) => t.transferGroupId == e.transferGroupId && t.id != e.id,
+        orElse: () => e,
+      );
+      _toId = other.accountId ?? _toId;
+      _date = e.competenceDate;
+    }
   }
 
   @override
@@ -116,7 +135,7 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : const Text('Transferir'),
+                : Text(_isEditing ? 'Salvar alterações' : 'Transferir'),
           ),
         ],
       ),
@@ -139,15 +158,21 @@ class _TransferFormScreenState extends State<TransferFormScreen> {
     }
     setState(() => _saving = true);
     try {
-      await context.read<AppController>().addTransfer(
-            fromAccountId: _fromId!,
-            toAccountId: _toId!,
-            amountCents: cents,
-            description: _description.text.trim(),
-            date: _date,
-          );
+      final c = context.read<AppController>();
+      if (_isEditing) {
+        // Reconstrói a transferência: remove as pernas antigas e cria novas.
+        await c.deleteTransfer(widget.editing!);
+      }
+      await c.addTransfer(
+        fromAccountId: _fromId!,
+        toAccountId: _toId!,
+        amountCents: cents,
+        description: _description.text.trim(),
+        date: _date,
+      );
       if (mounted) {
-        showToast(context, 'Transferência concluída.');
+        showToast(context,
+            _isEditing ? 'Transferência atualizada.' : 'Transferência concluída.');
         Navigator.pop(context);
       }
     } catch (_) {

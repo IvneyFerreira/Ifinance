@@ -9,6 +9,7 @@ import '../accounts/accounts_screen.dart';
 import '../assistant/assistant_screen.dart';
 import '../budgets/budgets_screen.dart';
 import '../cards/cards_screen.dart';
+import '../data/data_screen.dart';
 import '../recurring/recurring_screen.dart';
 import '../settings/settings_screen.dart';
 import '../wealth/wealth_screen.dart';
@@ -152,6 +153,7 @@ class ProfileScreen extends StatelessWidget {
             (Icons.subscriptions_outlined, 'Assinaturas', 'subscriptions'),
             (Icons.savings_outlined, 'Patrimônio', 'wealth'),
             (Icons.bar_chart, 'Relatórios', 'reports'),
+            (Icons.backup_outlined, 'Importar / Exportar', 'data'),
             (Icons.settings_outlined, 'Configurações', 'settings'),
           ]),
         ],
@@ -223,6 +225,8 @@ class ProfileScreen extends StatelessWidget {
         return const WealthScreen();
       case 'reports':
         return const ReportsScreen();
+      case 'data':
+        return const DataScreen();
       case 'settings':
         return const SettingsScreen();
       default:

@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import 'categories_screen.dart';
 
 /// Configurações (cap. 6/47/71/72): tema, margem de segurança, reserva;
 /// verificação de e-mail; exportação; exclusão de conta.
@@ -71,6 +72,23 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 22),
+          SectionHeader(title: 'Moeda e formato'),
+          FinancialCard(
+            child: _row(
+              context,
+              'Moeda',
+              _currencyLabel(s.currency),
+              onTap: () => _editCurrency(context, c, s),
+            ),
+          ),
+          const SizedBox(height: 22),
+          SectionHeader(title: 'Categorias'),
+          FinancialCard(
+            child: _row(context, 'Gerenciar categorias', 'Editar',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CategoriesScreen()))),
+          ),
+          const SizedBox(height: 22),
           SectionHeader(title: 'Conta'),
           FinancialCard(
             child: Column(
@@ -105,6 +123,27 @@ class SettingsScreen extends StatelessWidget {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading:
+                      const Icon(Icons.restart_alt, color: AppColors.warning),
+                  title: const Text('Redefinir dados financeiros'),
+                  subtitle: const Text('Apaga lançamentos e recomeça do zero'),
+                  onTap: () async {
+                    final ok = await showConfirmDialog(context,
+                        title: 'Redefinir dados',
+                        message:
+                            'Isso removerá contas, movimentações, cartões e metas, recriando categorias padrão. Sua conta de acesso é mantida.',
+                        confirmLabel: 'Redefinir',
+                        destructive: true);
+                    if (ok) {
+                      await context.read<AppController>().resetFinancialData();
+                      if (context.mounted) {
+                        showToast(context, 'Dados redefinidos.');
+                      }
+                    }
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading:
                       const Icon(Icons.delete_forever, color: AppColors.negative),
                   title: const Text('Excluir conta e dados'),
                   subtitle: const Text('Ação permanente e irreversível'),
@@ -128,6 +167,80 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  String _currencyLabel(String code) {
+    switch (code) {
+      case 'BRL':
+        return 'Real (R\$)';
+      case 'USD':
+        return 'Dólar (US\$)';
+      case 'EUR':
+        return 'Euro (€)';
+      default:
+        return code;
+    }
+  }
+
+  void _editCurrency(BuildContext context, AppController c, UserSettings s) {
+    const options = <(String, String, String)>[
+      ('BRL', 'Real brasileiro', 'R\$'),
+      ('USD', 'Dólar americano', 'US\$'),
+      ('EUR', 'Euro', '€'),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          ),
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Moeda',
+                    style: Theme.of(ctx)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                ...options.map((o) {
+                  final selected = s.currency == o.$1;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.emerald.withValues(alpha: 0.15),
+                      child: Text(o.$3,
+                          style: const TextStyle(
+                              color: AppColors.emerald,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    title: Text(o.$2),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle,
+                            color: AppColors.emerald)
+                        : null,
+                    onTap: () {
+                      c.updateSettings(s.copyWith(currency: o.$1));
+                      Money.setSymbol(o.$3);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

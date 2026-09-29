@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../shell/quick_add.dart';
 import 'date_field.dart';
 
-/// Nova despesa (cap. 14): valor, descrição, categoria, data, conta/cartão.
+/// Nova despesa / edição (cap. 14): valor, descrição, categoria, data, conta/cartão.
 /// "Mais detalhes": subcategoria/tags/observação/recorrência/centro de custo.
 class ExpenseFormScreen extends StatefulWidget {
-  const ExpenseFormScreen({super.key});
+  final Transaction? editing;
+  const ExpenseFormScreen({super.key, this.editing});
 
   @override
   State<ExpenseFormScreen> createState() => _ExpenseFormScreenState();
@@ -28,6 +31,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   bool _paid = true;
   bool _showMore = false;
   bool _saving = false;
+  bool _isInvoicePayment = false;
+
+  bool get _isEditing => widget.editing != null;
 
   @override
   void initState() {
@@ -36,6 +42,26 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     _accountId = c.accounts.isNotEmpty ? c.accounts.first.id : null;
     final expenseCats = c.categories.where((x) => !x.isIncome).toList();
     if (expenseCats.isNotEmpty) _categoryId = expenseCats.first.id;
+
+    final e = widget.editing;
+    if (e != null) {
+      final purchase = e.purchaseId == null
+          ? null
+          : c.purchases.where((p) => p.id == e.purchaseId).cast<CardPurchase?>().firstOrNull;
+      _amount.text = MoneyInputFormatter.formatCents(
+          purchase?.totalCents ?? e.amountCents);
+      _description.text = purchase?.description ?? e.description;
+      _notes.text = e.notes;
+      _categoryId = e.categoryId ?? purchase?.categoryId ?? _categoryId;
+      _cardId = e.creditCardId;
+      _accountId = e.accountId ?? _accountId;
+      _date = purchase?.firstReferenceMonth ?? e.competenceDate;
+      _method = e.paymentMethod;
+      _paid = e.isPaid;
+      _isInvoicePayment = e.isInvoicePayment;
+    } else {
+      _paid = true;
+    }
   }
 
   @override
@@ -49,11 +75,34 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
+    final e = widget.editing;
+    final isInvoice = _isInvoicePayment || (e?.isInvoicePayment ?? false);
     return Scaffold(
-      appBar: AppBar(title: const Text('Nova despesa')),
+      appBar: AppBar(
+          title: Text(
+              e == null ? 'Nova despesa' : (isInvoice ? 'Pagamento de fatura' : 'Editar despesa'))),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          if (isInvoice) ...[
+            FinancialCard(
+              color: AppColors.warning.withValues(alpha: 0.08),
+              border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppColors.warning, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Este é o pagamento de uma fatura (movimentação de caixa). Ele não conta como nova despesa no resultado.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
           MoneyField(controller: _amount),
           const SizedBox(height: 14),
           TextField(
@@ -170,7 +219,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
-                : const Text('Salvar despesa'),
+                : Text(_isEditing ? 'Salvar alterações' : 'Salvar despesa'),
           ),
         ],
       ),
@@ -187,10 +236,48 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       showToast(context, 'Informe uma descrição.', error: true);
       return;
     }
+    if (_cardId == null && _accountId == null) {
+      showToast(context, 'Selecione uma conta.', error: true);
+      return;
+    }
     setState(() => _saving = true);
     final c = context.read<AppController>();
+    final e = widget.editing;
     try {
-      if (_cardId != null) {
+      if (e != null) {
+        if (e.purchaseId != null) {
+          // Edição de compra no cartão: reconstrói transações e parcelas.
+          final purchase = c.purchases.firstWhere((p) => p.id == e.purchaseId);
+          await c.updateCardPurchase(
+            purchase: purchase,
+            totalCents: cents,
+            installmentsCount: purchase.installmentsCount,
+            categoryId: _categoryId,
+            creditCardId: _cardId,
+            description: _description.text.trim(),
+            purchaseDate: _date,
+          );
+        } else {
+          await c.updateTransaction(
+            e,
+            e.copyWith(
+              description: _description.text.trim(),
+              amountCents: cents,
+              categoryId: _categoryId,
+              accountId: _cardId == null ? _accountId : null,
+              creditCardId: _cardId,
+              competenceDate: _date,
+              dueDate: _date,
+              paymentMethod: _method,
+              notes: _notes.text.trim(),
+              paidAt: _paid ? (_date) : null,
+              clearPaidAt: !_paid,
+              expenseStatus: _paid ? ExpenseStatus.paid : ExpenseStatus.pending,
+              updatedAt: DateTime.now(),
+            ),
+          );
+        }
+      } else if (_cardId != null) {
         await c.addCardPurchase(
           creditCardId: _cardId!,
           description: _description.text.trim(),
@@ -212,10 +299,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         );
       }
       if (mounted) {
-        showToast(context, 'Despesa registrada.');
+        showToast(context, _isEditing ? 'Alterações salvas.' : 'Despesa registrada.');
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (err) {
       if (mounted) {
         showToast(context,
             'Não conseguimos salvar essa movimentação. Seus dados não foram alterados. Tente novamente.',

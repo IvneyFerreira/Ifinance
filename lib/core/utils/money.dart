@@ -8,17 +8,26 @@ import 'package:intl/intl.dart';
 class Money {
   Money._();
 
-  static final NumberFormat _brl = NumberFormat.currency(
-    locale: 'pt_BR',
-    symbol: 'R\$',
-    decimalDigits: 2,
-  );
+  /// Símbolo atual (configurável em Configurações). Padrão: R$.
+  static String _symbol = 'R\$';
 
-  static final NumberFormat _brlCompact = NumberFormat.currency(
-    locale: 'pt_BR',
-    symbol: 'R\$',
-    decimalDigits: 0,
-  );
+  static String get symbol => _symbol;
+
+  static NumberFormat _makeBrl(int digits) => NumberFormat.currency(
+        locale: 'pt_BR',
+        symbol: _symbol,
+        decimalDigits: digits,
+      );
+
+  static NumberFormat _brl = _makeBrl(2);
+  static NumberFormat _brlCompact = _makeBrl(0);
+
+  /// Troca o símbolo da moeda (ex.: 'R\$', 'US\$', '€') e reformata.
+  static void setSymbol(String symbol) {
+    _symbol = symbol;
+    _brl = _makeBrl(2);
+    _brlCompact = _makeBrl(0);
+  }
 
   /// Formata centavos para o padrão monetário brasileiro.
   /// Ex.: 1050 -> "R$ 10,50"

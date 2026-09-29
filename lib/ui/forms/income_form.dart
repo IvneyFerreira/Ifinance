@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../shell/quick_add.dart';
@@ -39,7 +40,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     if (cats.isNotEmpty) _categoryId = cats.first.id;
     final e = widget.editing;
     if (e != null) {
-      _amount.text = (e.amountCents / 100).toStringAsFixed(2).replaceAll('.', ',');
+      _amount.text = MoneyInputFormatter.formatCents(e.amountCents);
       _description.text = e.description;
       _notes.text = e.notes;
       _categoryId = e.categoryId ?? _categoryId;
@@ -185,16 +186,37 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     }
     setState(() => _saving = true);
     final c = context.read<AppController>();
+    final e = widget.editing;
     try {
-      await c.addIncome(
-        description: _description.text.trim(),
-        amountCents: cents,
-        accountId: _accountId!,
-        categoryId: _categoryId,
-        date: _expectedDate,
-        received: _received,
-        notes: _notes.text.trim(),
-      );
+      if (e != null) {
+        await c.updateTransaction(
+          e,
+          e.copyWith(
+            description: _description.text.trim(),
+            amountCents: cents,
+            categoryId: _categoryId,
+            accountId: _accountId,
+            competenceDate: _expectedDate,
+            dueDate: _expectedDate,
+            notes: _notes.text.trim(),
+            paidAt: _received ? (_receivedDate ?? _expectedDate) : null,
+            clearPaidAt: !_received,
+            incomeStatus:
+                _received ? IncomeStatus.received : IncomeStatus.expected,
+            updatedAt: DateTime.now(),
+          ),
+        );
+      } else {
+        await c.addIncome(
+          description: _description.text.trim(),
+          amountCents: cents,
+          accountId: _accountId!,
+          categoryId: _categoryId,
+          date: _expectedDate,
+          received: _received,
+          notes: _notes.text.trim(),
+        );
+      }
       if (_recurring) {
         await c.saveRecurring(RecurringRule(
           id: c.repo.newId(),
@@ -211,7 +233,8 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
         ));
       }
       if (mounted) {
-        showToast(context, 'Receita registrada.');
+        showToast(context,
+            widget.editing == null ? 'Receita registrada.' : 'Alterações salvas.');
         Navigator.pop(context);
       }
     } catch (_) {

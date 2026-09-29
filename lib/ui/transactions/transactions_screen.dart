@@ -6,7 +6,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../forms/expense_form.dart';
 import '../forms/income_form.dart';
+import '../forms/transfer_form.dart';
 import '../widgets/transaction_tile.dart';
 
 /// Movimentações (cap. 13): busca, filtros, período, categorias, contas,
@@ -396,36 +398,39 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 _detailRow(ctx, 'Status', _statusLabel(t)),
                 if (t.notes.isNotEmpty) _detailRow(ctx, 'Observação', t.notes),
                 const SizedBox(height: 18),
-                if (!t.isTransfer)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => IncomeFormScreen(editing: t),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.edit_outlined),
-                          label: const Text('Editar'),
-                        ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => _editFormFor(t),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Editar'),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () async {
-                            await c.markTransactionPaid(t, paid: !t.isPaid);
-                            if (ctx.mounted) Navigator.pop(ctx);
-                          },
-                          child: Text(t.isPaid ? 'Marcar pendente' : 'Confirmar'),
-                        ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: t.isTransfer
+                            ? null
+                            : () async {
+                                await c.markTransactionPaid(t, paid: !t.isPaid);
+                                if (ctx.mounted) Navigator.pop(ctx);
+                              },
+                        child: Text(t.isTransfer
+                            ? 'Transferência'
+                            : (t.isPaid ? 'Marcar pendente' : 'Confirmar')),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -434,13 +439,18 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       final ok = await showConfirmDialog(
                         ctx,
                         title: 'Excluir movimentação',
-                        message:
-                            'Tem certeza que deseja excluir "${t.description}"? Esta ação será registrada.',
+                        message: t.isTransfer
+                            ? 'Tem certeza que deseja excluir esta transferência? As duas contas envolvidas serão ajustadas.'
+                            : 'Tem certeza que deseja excluir "${t.description}"? Esta ação será registrada.',
                         confirmLabel: 'Excluir',
                         destructive: true,
                       );
                       if (ok) {
-                        await c.deleteTransaction(t);
+                        if (t.isTransfer) {
+                          await c.deleteTransfer(t);
+                        } else {
+                          await c.deleteTransaction(t);
+                        }
                         if (ctx.mounted) Navigator.pop(ctx);
                       }
                     },
@@ -473,6 +483,16 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ],
       ),
     );
+  }
+
+  /// Escolhe o formulário de edição correto conforme o tipo da movimentação.
+  Widget _editFormFor(Transaction t) {
+    if (t.isTransfer) return TransferFormScreen(editing: t);
+    if (t.isInvoicePayment || (t.creditCardId == null && t.isExpense)) {
+      return ExpenseFormScreen(editing: t);
+    }
+    if (t.isIncome) return IncomeFormScreen(editing: t);
+    return ExpenseFormScreen(editing: t);
   }
 
   String _typeLabel(Transaction t) {
