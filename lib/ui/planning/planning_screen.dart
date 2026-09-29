@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/finance/finance_models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money.dart';

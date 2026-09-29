@@ -9,7 +9,7 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppController()..bootstrap(),
-      child: const NeyFlowApp(),
+      child: const IFinanceApp(),
     ),
   );
 }

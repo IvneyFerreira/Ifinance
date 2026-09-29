@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../state/app_controller.dart';
-import '../calendar/calendar_screen.dart';
-import '../cards/cards_screen.dart';
 import '../dashboard/home_screen.dart';
 import '../goals/goals_screen.dart';
 import '../planning/planning_screen.dart';
@@ -205,7 +203,7 @@ class _Sidebar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(11),
                     ),
                     child: const Center(
-                      child: Text('N',
+                      child: Text('iF',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -213,7 +211,7 @@ class _Sidebar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('NeyFlow',
+                  Text('IFinance',
                       style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 ],
               ),

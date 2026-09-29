@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
@@ -46,7 +44,7 @@ class ProfileScreen extends StatelessWidget {
                     child: Text(
                       (c.user?.name.isNotEmpty ?? false)
                           ? c.user!.name.substring(0, 1).toUpperCase()
-                          : 'N',
+                          : 'iF',
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -119,7 +117,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          SectionHeader(title: 'Ney Assessor'),
+          SectionHeader(title: 'IFinance Assessor'),
           FinancialCard(
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AssistantScreen())),

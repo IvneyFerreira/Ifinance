@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/finance/finance_models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
-import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 

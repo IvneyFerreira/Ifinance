@@ -3,12 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/category_icons.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 
-/// Onboarding (cap. 51): guia o usuário em 7 etapas até "Seu NeyFlow está pronto".
+/// Onboarding (cap. 51): guia o usuário em 7 etapas até "Seu IFinance está pronto".
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -99,7 +98,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             children: [
               const CircleIcon(icon: Icons.waves, color: AppColors.emerald, size: 36),
               const SizedBox(width: 10),
-              Text('NeyFlow',
+              Text('IFinance',
                   style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const Spacer(),
               Text('${_step + 1} de ${_stepLabels.length}',
@@ -165,7 +164,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20),
-        Text('Bem-vindo ao NeyFlow.',
+        Text('Bem-vindo ao IFinance.',
             style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
         Text('Vamos colocar sua vida financeira sob controle.',
@@ -289,7 +288,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _stepTitle('Cadastre suas despesas recorrentes',
-            'Ex.: aluguel, internet, escola. O NeyFlow projetará os próximos meses.'),
+            'Ex.: aluguel, internet, escola. O IFinance projetará os próximos meses.'),
         TextField(
           controller: _expenseDesc,
           decoration: const InputDecoration(
@@ -436,7 +435,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final user = controller.user!;
       await _completeOnboarding();
       if (mounted) {
-        showToast(context, 'Seu NeyFlow está pronto.');
+        showToast(context, 'Seu IFinance está pronto.');
       }
       // O root troca para o Shell automaticamente.
       // ignore: unused_local_variable

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// Tema do NeyFlow. Dark mode tratado como experiência de primeira classe
+/// Tema do IFinance. Dark mode tratado como experiência de primeira classe
 /// (não apenas inversão de cores), com contraste e elevação próprios.
 class AppTheme {
   AppTheme._();

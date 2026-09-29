@@ -8,9 +8,9 @@ import 'ui/auth/login_screen.dart';
 import 'ui/onboarding/onboarding_screen.dart';
 import 'ui/shell/app_shell.dart';
 
-/// Raiz do NeyFlow. Decide entre autenticação, onboarding e o app principal.
-class NeyFlowApp extends StatelessWidget {
-  const NeyFlowApp({super.key});
+/// Raiz do IFinance. Decide entre autenticação, onboarding e o app principal.
+class IFinanceApp extends StatelessWidget {
+  const IFinanceApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class NeyFlowApp extends StatelessWidget {
       builder: (context, controller, _) {
         final mode = controller.themeMode;
         return MaterialApp(
-          title: 'NeyFlow',
+          title: 'IFinance',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
@@ -74,7 +74,7 @@ class _Splash extends StatelessWidget {
               ),
               child: const Center(
                 child: Text(
-                  'N',
+                  'iF',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 38,
@@ -85,7 +85,7 @@ class _Splash extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'NeyFlow',
+              'IFinance',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,

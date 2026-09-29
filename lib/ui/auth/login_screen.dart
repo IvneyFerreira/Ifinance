@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: const Center(
-                          child: Text('N',
+                          child: Text('iF',
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 28,
@@ -116,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('NeyFlow',
+                          Text('IFinance',
                               style: t.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.w800)),
                           Text('Personal Financial Command Center',

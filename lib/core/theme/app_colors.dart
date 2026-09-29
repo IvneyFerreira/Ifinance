@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// NeyFlow Design System — Paleta de cores.
+/// IFinance Design System — Paleta de cores.
 ///
 /// Estética: Premium, minimalista, tecnológica, elegante, financeira.
 /// Base: grafite profundo, preto suave, branco, cinzas neutros.

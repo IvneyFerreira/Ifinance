@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-/// NeyFlow — Valores monetários.
+/// IFinance — Valores monetários.
 ///
 /// REGRA CRÍTICA (cap. 60): Nunca utilizar float/double para dinheiro.
 /// Todos os valores são armazenados e calculados como inteiros

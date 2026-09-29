@@ -1,16 +1,47 @@
-# neyflow
+# IFinance
 
-A new Flutter project.
+**Personal Financial Command Center** — Sua vida financeira em movimento. Sob controle.
 
-## Getting Started
+O IFinance responde às perguntas que realmente importam:
 
-This project is a starting point for a Flutter application.
+- Quanto eu tenho?
+- Quanto está comprometido?
+- Quanto está realmente livre?
+- Como eu vou terminar o mês?
 
-A few resources to get you started if this is your first Flutter project:
+## Descrição
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Aplicativo Flutter (Android + Web/PWA) de gestão financeira pessoal, com tema escuro premium (grafite/esmeralda) e uma camada central de cálculo financeiro (`FinanceEngine`) que separa a lógica das telas.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Principais recursos
+
+- **Dashboard** inteligente (saldo seguro, comprometido, projeção de fim de mês)
+- **Contas, Cartões e Faturas** (com parcelamento sem perder centavos)
+- **Transações** (receitas, despesas e transferências entre contas)
+- **Calendário financeiro** e recorrentes
+- **Planejamento, Orçamentos e Metas**
+- **Patrimônio, Dívidas e Assinaturas**
+- **Simulador** de cenários e **Radar** de alertas
+- **IFinance Assessor** (assistente financeiro)
+- **Relatórios** e **Notificações**
+
+## Arquitetura
+
+- `lib/core/finance` — `FinanceEngine` (toda a lógica financeira)
+- `lib/core/models` — modelos de domínio (dinheiro sempre em centavos `int`)
+- `lib/core/db` — persistência local com Hive (isolamento multi-usuário)
+- `lib/core/services` — autenticação, seed demo
+- `lib/state` — `AppController` (Provider / ChangeNotifier)
+- `lib/ui` — telas organizadas por módulo
+
+## Como executar
+
+```bash
+flutter pub get
+flutter run            # Android
+flutter build web --release
+```
+
+## Documentação
+
+- Flutter: https://docs.flutter.dev/

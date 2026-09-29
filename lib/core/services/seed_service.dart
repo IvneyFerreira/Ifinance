@@ -4,7 +4,7 @@ import '../utils/category_icons.dart';
 
 /// Seed de ambiente de DESENVOLVIMENTO (cap. 92).
 /// Cria um usuário demo com contas, categorias, cartões, movimentações,
-/// metas e orçamentos coerentes para demonstrar o NeyFlow funcionando de
+/// metas e orçamentos coerentes para demonstrar o IFinance funcionando de
 /// verdade (dados persistentes, cálculos reais — não telas estáticas).
 class SeedService {
   final Repository repo;

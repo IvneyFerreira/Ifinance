@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/category_icons.dart';
 import '../../core/utils/date_helpers.dart';
-import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../forms/income_form.dart';
@@ -68,7 +66,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               controller: _search,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Buscar no NeyFlow',
+                hintText: 'Buscar no IFinance',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _search.text.isNotEmpty
                     ? IconButton(

@@ -9,7 +9,7 @@ import 'recurrence_materializer.dart';
 /// Informação de próxima receita (data + valor).
 typedef IncomeInfo = ({DateTime date, int amount});
 
-/// NeyFlow FinanceEngine — motor financeiro central (cap. 62).
+/// IFinance FinanceEngine — motor financeiro central (cap. 62).
 ///
 /// Toda a inteligência financeira vive AQUI, nunca na UI (cap. 56/89).
 /// Valores em CENTAVOS (int). Regras contábeis consistentes:
@@ -462,7 +462,9 @@ class FinanceEngine {
         if (t.categoryId != b.categoryId) continue;
         if (!t.isExpense || t.isTransfer) continue;
         if (DateHelpers.dateOnly(t.competenceDate).isBefore(start) ||
-            DateHelpers.dateOnly(t.competenceDate).isAfter(end)) continue;
+            DateHelpers.dateOnly(t.competenceDate).isAfter(end)) {
+          continue;
+        }
         consumed += t.amountCents;
       }
       return BudgetUsage(

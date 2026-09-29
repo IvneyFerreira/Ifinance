@@ -1,6 +1,7 @@
-/// Enums centrais do domínio NeyFlow.
+/// Enums centrais do domínio IFinance.
 /// Regra (cap. 68): não depender apenas de texto traduzido no banco —
 /// usamos valores estáveis em inglês (enum.name) e traduzimos na UI.
+library;
 
 /// Tipo de movimentação de caixa.
 enum TransactionType { income, expense, adjustment }

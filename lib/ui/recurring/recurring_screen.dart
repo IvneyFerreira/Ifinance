@@ -23,7 +23,7 @@ class RecurringScreen extends StatelessWidget {
               icon: Icons.autorenew,
               title: 'Nenhuma recorrência',
               message:
-                  'Cadastre gastos e receitas recorrentes. O NeyFlow projetará os próximos meses.',
+                  'Cadastre gastos e receitas recorrentes. O IFinance projetará os próximos meses.',
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),

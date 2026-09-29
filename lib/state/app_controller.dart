@@ -47,7 +47,7 @@ class AppController extends ChangeNotifier {
   UserSettings get settings => _settings;
   AppThemeMode get themeMode => _themeMode;
 
-  static const _sessionKey = 'neyflow_session_user';
+  static const _sessionKey = 'ifinance_session_user';
 
   /// Motor financeiro do usuário atual.
   FinanceEngine get engine => FinanceEngine(
@@ -154,8 +154,8 @@ class AppController extends ChangeNotifier {
 
   /// Entra com a conta de demonstração, criando dados de exemplo se necessário.
   Future<void> loginDemo() async {
-    const demoEmail = 'demo@neyflow.app';
-    const demoPassword = 'neyflow123';
+    const demoEmail = 'demo@ifinance.app';
+    const demoPassword = 'ifinance123';
     if (!auth.emailExists(demoEmail)) {
       final user = await auth.register(
         name: 'Ney',

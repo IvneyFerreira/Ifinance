@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 
-/// Ney Assessor (cap. 36-39): tela estilo chat. A IA NÃO calcula — ela explica
+/// IFinance Assessor (cap. 36-39): tela estilo chat. A IA NÃO calcula — ela explica
 /// o resultado estruturado fornecido pelo FinanceEngine.
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -116,7 +115,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ney Assessor')),
+      appBar: AppBar(title: const Text('IFinance Assessor')),
       body: Column(
         children: [
           Expanded(

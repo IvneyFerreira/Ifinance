@@ -123,7 +123,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           Center(
-            child: Text('NeyFlow 1.0 • ${s.currency}',
+            child: Text('IFinance 1.0 • ${s.currency}',
                 style: t.bodySmall),
           ),
         ],

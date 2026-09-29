@@ -24,7 +24,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   final _amount = TextEditingController();
   int _installments = 1;
   bool _viaCard = true;
-  DateTime _date = DateTime.now();
+  final DateTime _date = DateTime.now();
 
   @override
   void dispose() {

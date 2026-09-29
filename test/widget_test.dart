@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:neyflow/core/utils/money.dart';
+import 'package:ifinance/core/utils/money.dart';
 
 void main() {
   group('Money — valores em centavos (sem float)', () {

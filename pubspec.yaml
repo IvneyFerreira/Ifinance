@@ -1,5 +1,5 @@
-name: neyflow
-description: "NeyFlow — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
+name: ifinance
+description: "IFinance — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
 publish_to: 'none'
 
 version: 1.0.0+1
