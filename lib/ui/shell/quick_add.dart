@@ -4,6 +4,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/category_icons.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../forms/expense_form.dart';
 import '../forms/income_form.dart';
@@ -220,24 +221,86 @@ class AccountPicker extends StatelessWidget {
   }
 }
 
-/// Campo monetário com formatação.
-class MoneyField extends StatelessWidget {
+/// Campo monetário com formatação automática (pt-BR).
+///
+/// Digite apenas números e a pontuação é aplicada sozinha:
+///   3000  -> 3.000,00
+///   150075 -> 1.500,75
+class MoneyField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
-  const MoneyField({super.key, required this.controller, this.label = 'Valor (R\$)'});
+  final bool autofocus;
+  const MoneyField({
+    super.key,
+    required this.controller,
+    this.label = 'Valor',
+    this.autofocus = false,
+  });
+
+  @override
+  State<MoneyField> createState() => _MoneyFieldState();
+}
+
+class _MoneyFieldState extends State<MoneyField> {
+  @override
+  void initState() {
+    super.initState();
+    // Se o valor já chegou sem máscara, formata agora.
+    _normalize();
+    widget.controller.addListener(_guard);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_guard);
+    super.dispose();
+  }
+
+  void _normalize() {
+    final t = widget.controller.text;
+    if (t.trim().isEmpty) return;
+    final digits = t.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return;
+    final formatted = MoneyInputFormatter.formatFromDigits(
+        digits.replaceFirst(RegExp(r'^0+(?=\d)'), ''));
+    if (formatted != t) {
+      widget.controller.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+  }
+
+  void _guard() {
+    // Garante re-render do prefixo/valor quando o texto muda externamente.
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
+      controller: widget.controller,
+      autofocus: widget.autofocus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [MoneyInputFormatter()],
+      style: Theme.of(context)
+          .textTheme
+          .headlineSmall
+          ?.copyWith(fontWeight: FontWeight.w700),
       decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: const Icon(Icons.attach_money),
+        labelText: widget.label,
+        prefixText: 'R\$ ',
+        prefixStyle: Theme.of(context)
+            .textTheme
+            .headlineSmall
+            ?.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald),
+        helperText: widget.controller.text.isEmpty
+            ? null
+            : 'Valor em reais (pontuação automática)',
       ),
     );
   }
 }
 
-/// Helper de validação de valor monetário.
-int? parseMoney(TextEditingController c) => Money.parse(c.text);
+/// Helper de validação de valor monetário (a partir do texto mascarado).
+int? parseMoney(TextEditingController c) => MoneyInput.parse(c.text);

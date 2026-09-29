@@ -54,7 +54,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MoneyField(controller: _amount, label: 'Quanto pretende gastar? (R\$)'),
+                MoneyField(controller: _amount, label: 'Quanto pretende gastar?'),
                 const SizedBox(height: 14),
                 Text('Forma',
                     style: Theme.of(context)

@@ -88,7 +88,7 @@ class _CardPurchaseFormScreenState extends State<CardPurchaseFormScreen> {
               }).toList(),
             ),
             const SizedBox(height: 18),
-            MoneyField(controller: _amount, label: 'Valor total (R\$)'),
+            MoneyField(controller: _amount, label: 'Valor total'),
             const SizedBox(height: 14),
             TextField(
               controller: _description,
