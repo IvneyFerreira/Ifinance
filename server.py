@@ -29,15 +29,21 @@ LLM_KEY = os.environ.get("OPENAI_API_KEY", "")
 LLM_MODEL = os.environ.get("IFINANCE_LLM_MODEL", "gpt-5.4-mini")
 LLM_ENABLED = bool(LLM_BASE and LLM_KEY)
 
-SYSTEM_PROMPT = """Você é o Assessor Financeiro do IFinance, um assistente pessoal especializado EXCLUSIVAMENTE em despesas e gastos do usuário.
+SYSTEM_PROMPT = """Você é o Assessor Financeiro do IFinance, um assistente pessoal especializado EXCLUSIVAMENTE na vida financeira do usuário.
+
+ESCOPO PERMITIDO (fale SOMENTE sobre isto):
+- Despesas e gastos (por categoria, orçamento, maiores gastos, cortes).
+- Entradas / receitas (quanto entrou, de onde vem a renda, próximo recebimento).
+- Saldo, comprometido, livre para gastar, projeção de fim de mês, fluxo do mês.
+- Cartões e faturas, assinaturas/recorrentes, dívidas e metas financeiras.
 
 REGRAS OBRIGATÓRIAS:
-- Você só responde sobre despesas, gastos, orçamento, categorias de gasto, assinaturas, faturas de cartão e como reduzir/controlar despesas.
-- Se o usuário perguntar sobre qualquer outro assunto (notícias, programação, piadas, saúde, etc.), recuse com educação e diga que você só ajuda com as despesas e o controle de gastos dele.
+- Você é um assistente FINANCEIRO. Você NUNCA fala sobre assuntos aleatórios ou fora de finanças pessoais (notícias, programação, piadas, saúde, receitas culinárias, conhecimentos gerais, opiniões, etc.).
+- Se o pedido não for sobre finanças do usuário, recuse de forma educada e breve, e ofereça ajuda financeira.
 - NUNCA invente números. Use SOMENTE os dados fornecidos no CONTEXTO FINANCEIRO. Se um dado não estiver no contexto, diga que ainda não há registro suficiente.
-- Todos os valores estão em reais (R$) e já formatados no padrão brasileiro (ex.: R$ 3.000,00). Nunca faça cálculos complexos por conta própria; prefira citar os valores do contexto.
+- Todos os valores estão em reais (R$) já formatados no padrão brasileiro (ex.: R$ 3.000,00). Nunca faça cálculos complexos por conta própria; prefira citar os valores do contexto.
 - Seja direto, prático e empático. Responda em português do Brasil.
-- Prefira respostas curtas (2 a 5 frases), com foco em ação: onde o usuário está gastando e o que pode fazer para reduzir.
+- Prefira respostas curtas (2 a 5 frases), com foco em ação financeira.
 - Quando citar valores, use exatamente os valores do contexto.
 """
 
@@ -67,18 +73,20 @@ def _call_llm(messages, timeout=90):
 def _build_context_prompt(context: dict) -> str:
     """Transforma o contexto estruturado (vindo do FinanceEngine) em texto."""
     lines = []
-    lines.append("### CONTEXTO FINANCEIRO (foco: DESPESAS)")
+    lines.append("### CONTEXTO FINANCEIRO (despesas, entradas e controle)")
     lines.append(f"Data de referência: {context.get('today', datetime.now().strftime('%d/%m/%Y'))}")
     lines.append(f"Mês de referência: {context.get('monthLabel', '')}")
 
     month = context.get("month", {}) or {}
     lines.append("\n**Resumo do mês**")
+    lines.append(f"- Entradas (receitas) do mês: {month.get('income', 'R$ 0,00')}")
     lines.append(f"- Despesas do mês: {month.get('expense', 'R$ 0,00')}")
-    lines.append(f"- Receitas do mês: {month.get('income', 'R$ 0,00')}")
-    lines.append(f"- Resultado do mês: {month.get('result', 'R$ 0,00')}")
+    lines.append(f"- Resultado do mês (entradas - despesas): {month.get('result', 'R$ 0,00')}")
+    lines.append(f"- Taxa de poupança: {month.get('savingsRate', '-')}")
     lines.append(f"- Comprometido até o fim do mês: {month.get('committed', 'R$ 0,00')}")
     lines.append(f"- Saldo disponível hoje: {context.get('available', 'R$ 0,00')}")
     lines.append(f"- Livre para gastar com segurança: {context.get('safeToSpend', 'R$ 0,00')}")
+    lines.append(f"- Próximo recebimento: {context.get('nextIncome', 'sem previsão')}")
 
     cats = context.get("topCategories", []) or []
     lines.append("\n**Onde o usuário mais gastou neste mês**")
@@ -87,6 +95,22 @@ def _build_context_prompt(context: dict) -> str:
             lines.append(f"{i}. {c.get('name')}: {c.get('amount')} ({c.get('percent', '')} do total)")
     else:
         lines.append("- Nenhuma despesa registrada neste mês.")
+
+    incomes = context.get("incomes", []) or []
+    lines.append("\n**Entradas / receitas do mês**")
+    if incomes:
+        for inc in incomes[:8]:
+            lines.append(f"- {inc.get('name')}: {inc.get('amount')} em {inc.get('date', '')}")
+    else:
+        lines.append("- Nenhuma receita registrada neste mês.")
+
+    recent = context.get("recentExpenses", []) or []
+    lines.append("\n**Últimas despesas registradas**")
+    if recent:
+        for r in recent[:10]:
+            lines.append(f"- {r.get('date', '')} | {r.get('name')} | {r.get('category')} | {r.get('amount')}")
+    else:
+        lines.append("- Sem despesas recentes.")
 
     subs = context.get("subscriptions", {}) or {}
     lines.append("\n**Assinaturas / recorrentes de despesa**")
@@ -146,7 +170,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "status": "ok",
                 "ai_enabled": LLM_ENABLED,
                 "model": LLM_MODEL if LLM_ENABLED else None,
-                "scope": "despesas",
+                "scope": "financas (despesas e entradas)",
             })
             return
         # Flutter web: web/ usa SPA. Fallback p/ index.html em rotas sem arquivo.

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/services/assessor_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/app_controller.dart';
 
-/// IFinance Assessor (cap. 36-39): tela estilo chat. A IA NÃO calcula — ela explica
-/// o resultado estruturado fornecido pelo FinanceEngine.
+/// IFinance Assessor (cap. 36-39): assistente FINANCEIRO com IA real.
+///
+/// A IA recebe um CONTEXTO FINANCEIRO (montado pelo FinanceEngine) com despesas,
+/// entradas, orçamentos, cartões e assinaturas — e ajuda o usuário SOMENTE com a
+/// vida financeira dele. Assuntos aleatórios são recusados.
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
 
@@ -16,24 +20,45 @@ class AssistantScreen extends StatefulWidget {
 class _Msg {
   final String text;
   final bool fromUser;
-  final String? calculation;
-  _Msg(this.text, {this.fromUser = false, this.calculation});
+  final bool isError;
+  final bool loading;
+  _Msg(this.text, {this.fromUser = false, this.isError = false, this.loading = false});
 }
 
 class _AssistantScreenState extends State<AssistantScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
+  final _api = AssessorApi();
+
+  bool? _aiEnabled; // null = verificando
+  bool _sending = false;
+
   final List<_Msg> _messages = [
-    _Msg('Olá. O que você quer entender sobre suas finanças hoje?'),
+    _Msg(
+      'Olá! Sou seu Assessor Financeiro. Posso te ajudar com despesas, entradas, '
+      'orçamentos, cartões e assinaturas — sempre com base nos seus dados reais.\n\n'
+      'Pergunte, por exemplo: "Onde estou gastando mais?" ou "Quanto entrou este mês?".',
+    ),
   ];
 
   static const _suggestions = [
-    'Quanto posso gastar?',
-    'Como termina meu mês?',
     'Onde estou gastando mais?',
-    'Quanto tenho comprometido?',
-    'Como está meu cartão?',
+    'Quanto entrou este mês?',
+    'Estou dentro do orçamento?',
+    'Como estão minhas assinaturas?',
+    'Como reduzir minhas despesas?',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAi();
+  }
+
+  Future<void> _checkAi() async {
+    final ok = await _api.health();
+    if (mounted) setState(() => _aiEnabled = ok);
+  }
 
   @override
   void dispose() {
@@ -42,54 +67,50 @@ class _AssistantScreenState extends State<AssistantScreen> {
     super.dispose();
   }
 
-  void _send(String text) {
-    if (text.trim().isEmpty) return;
+  Future<void> _send(String text) async {
+    final q = text.trim();
+    if (q.isEmpty || _sending) return;
     final c = context.read<AppController>();
-    final engine = c.engine;
-    setState(() => _messages.add(_Msg(text, fromUser: true)));
+
+    // Histórico ANTES de adicionar a pergunta atual (o servidor já a envia).
+    final history = _messages
+        .where((m) => !m.loading && !m.isError)
+        .map((m) => {'text': m.text, 'fromUser': m.fromUser})
+        .toList();
+
+    setState(() {
+      _messages.add(_Msg(q, fromUser: true));
+      _messages.add(_Msg('Analisando suas finanças...', loading: true));
+      _sending = true;
+    });
+    _scrollToEnd();
+
+    final context_ = FinancialContext.build(c.engine, c.budgets);
 
     String answer;
-    String? calc;
-    final q = text.toLowerCase();
-
-    if (q.contains('gastar') || q.contains('posso')) {
-      final d = engine.assistantSafeToSpend();
+    bool error = false;
+    try {
+      answer = await _api.ask(
+        question: q,
+        context: context_,
+        history: history,
+      );
+    } on AssessorException catch (e) {
+      answer = 'Não consegui falar com a IA agora. ${e.message}';
+      error = true;
+    } catch (_) {
       answer =
-          'Hoje você tem ${_m(d['free'] as int)} livres com segurança até ${_date(d['until'] as DateTime)}. Isso já desconta compromissos e sua margem de segurança.';
-      calc =
-          'Saldo ${_m(d['available'] as int)} − Compromissos ${_m(d['committed'] as int)} − Margem ${_m(d['margin'] as int)} = ${_m(d['free'] as int)}';
-    } else if (q.contains('mês') || q.contains('mes') || q.contains('termina')) {
-      final d = engine.assistantMonthOutlook();
-      answer =
-          'Este mês você recebeu ${_m(d['income'] as int)} e gastou ${_m(d['expense'] as int)}. Resultado: ${_m(d['result'] as int)}. Projeção de fim de mês: ${_m(d['projectedEnd'] as int)}.';
-    } else if (q.contains('onde') || q.contains('gastando') || q.contains('mais')) {
-      final top = engine.assistantTopCategories(limit: 3);
-      if (top.isEmpty) {
-        answer = 'Ainda não há despesas registradas neste mês.';
-      } else {
-        answer = 'Onde você mais gastou: '
-            '${top.map((e) => '${e.name} (${_m(e.amount)})').join(', ')}.';
-      }
-    } else if (q.contains('comprometido')) {
-      final d = engine.assistantCommitted();
-      answer =
-          'Você tem ${_m(d['committedMonth'] as int)} comprometidos até o fim do mês.';
-    } else if (q.contains('cartão') || q.contains('cartao')) {
-      final d = engine.assistantCardStatus();
-      final cards = (d['cards'] as List);
-      if (cards.isEmpty) {
-        answer = 'Você ainda não cadastrou cartões.';
-      } else {
-        answer = cards
-            .map((x) => '${x['name']}: fatura atual ${_m(x['currentInvoice'] as int)}, disponível ${_m(x['available'] as int)}')
-            .join('. ');
-      }
-    } else {
-      answer =
-          'Posso te ajudar com: quanto você pode gastar, como termina o mês, onde está gastando mais, quanto está comprometido e como está seu cartão.';
+          'Não consegui falar com a IA agora. Verifique sua conexão e tente novamente.';
+      error = true;
     }
 
-    setState(() => _messages.add(_Msg(answer, calculation: calc)));
+    if (!mounted) return;
+    setState(() {
+      _messages.removeWhere((m) => m.loading);
+      _messages.add(_Msg(answer, isError: error));
+      _sending = false;
+      _aiEnabled = !error || _aiEnabled != false;
+    });
     _scrollToEnd();
   }
 
@@ -102,20 +123,32 @@ class _AssistantScreenState extends State<AssistantScreen> {
     });
   }
 
-  static String _m(int cents) {
-    final s = (cents / 100).toStringAsFixed(2);
-    final parts = s.split('.');
-    final intPart = parts[0].replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.');
-    return 'R\$ $intPart,${parts[1]}';
-  }
-
-  static String _date(DateTime d) => '${d.day}/${d.month}';
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('IFinance Assessor')),
+      appBar: AppBar(
+        title: const Text('IFinance Assessor'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(22),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _aiEnabled == true
+                  ? 'IA financeira ativa • foco em despesas e entradas'
+                  : _aiEnabled == false
+                      ? 'IA indisponível no momento'
+                      : 'Conectando à IA...',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: _aiEnabled == true
+                    ? AppColors.emerald
+                    : AppColors.gray400,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -145,43 +178,52 @@ class _AssistantScreenState extends State<AssistantScreen> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.all(14),
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.8),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.circular(18),
           border: m.fromUser
               ? null
               : Border.all(
-                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                  color: m.isError
+                      ? AppColors.negativeSoft
+                      : (isDark ? AppColors.darkBorder : AppColors.lightBorder)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(m.text, style: t.bodyMedium?.copyWith(color: textColor, height: 1.4)),
-            if (m.calculation != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.emerald.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calculate_outlined,
-                        size: 15, color: AppColors.emerald),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Ver cálculo: ${m.calculation}',
-                          style: t.bodySmall?.copyWith(fontSize: 11, height: 1.35)),
+        child: m.loading
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.emerald),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(m.text,
+                      style: t.bodySmall?.copyWith(color: AppColors.gray400)),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!m.fromUser) ...[
+                    const CircleAvatar(
+                      radius: 13,
+                      backgroundColor: AppColors.emerald,
+                      child: Icon(Icons.auto_awesome,
+                          size: 14, color: Colors.white),
                     ),
+                    const SizedBox(width: 10),
                   ],
-                ),
+                  Flexible(
+                    child: Text(m.text,
+                        style:
+                            t.bodyMedium?.copyWith(color: textColor, height: 1.42)),
+                  ),
+                ],
               ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -206,6 +248,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   Widget _inputBar() {
+    final disabled = _sending || _aiEnabled == false;
     return SafeArea(
       top: false,
       child: Padding(
@@ -215,24 +258,34 @@ class _AssistantScreenState extends State<AssistantScreen> {
             Expanded(
               child: TextField(
                 controller: _input,
-                onSubmitted: _send,
+                onSubmitted: _sending ? null : _send,
                 decoration: const InputDecoration(
-                  hintText: 'Pergunte algo...',
+                  hintText: 'Pergunte sobre suas finanças...',
                 ),
               ),
             ),
             const SizedBox(width: 10),
             Container(
-              decoration: const BoxDecoration(
-                color: AppColors.emerald,
+              decoration: BoxDecoration(
+                color: disabled ? AppColors.gray400 : AppColors.emerald,
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                onPressed: () {
-                  _send(_input.text);
-                  _input.clear();
-                },
-                icon: const Icon(Icons.send, color: Colors.white),
+                onPressed: disabled
+                    ? null
+                    : () {
+                        final txt = _input.text;
+                        _input.clear();
+                        _send(txt);
+                      },
+                icon: _sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.send, color: Colors.white),
               ),
             ),
           ],
