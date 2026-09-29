@@ -1,0 +1,33 @@
+name: neyflow
+description: "NeyFlow — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # State management
+  provider: ^6.1.5+1
+  # Local persistence (document DB + key-value)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  shared_preferences: ^2.5.3
+  # Utilidades
+  intl: ^0.20.2
+  uuid: ^4.5.1
+  google_fonts: ^6.3.2
+  crypto: ^3.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
