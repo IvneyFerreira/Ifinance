@@ -602,13 +602,21 @@ class FinanceEngine {
   }
 
   // ---------------------------------------------------------------------------
-  // 11. RADAR FINANCEIRO (próximos 7 dias + insights)
+  // 11. RADAR FINANCEIRO (mês corrente + insights)
+  //
+  // O radar responde "o que vou tirar e receber NO MÊS", então a janela padrão
+  // é o mês inteiro (1º ao último dia), não os próximos 7 dias.
   // ---------------------------------------------------------------------------
 
-  RadarData getRadar({int days = 7}) {
+  RadarData getRadar({DateTime? from, DateTime? to}) {
     final today = DateHelpers.dateOnly(DateTime.now());
-    final end = DateHelpers.addDays(today, days);
-    final events = cashEvents(from: today, to: end)
+    final start = from != null
+        ? DateHelpers.dateOnly(from)
+        : DateHelpers.startOfMonth(today);
+    final end = to != null
+        ? DateHelpers.dateOnly(to)
+        : DateHelpers.dateOnly(DateHelpers.endOfMonth(today));
+    final events = cashEvents(from: start, to: end)
         .where((e) => !e.confirmed)
         .toList();
 
@@ -634,7 +642,7 @@ class FinanceEngine {
       insights.add(const Insight(
         severity: InsightSeverity.positive,
         title: 'Fluxo sob controle',
-        message: 'Tudo sob controle nos próximos 7 dias.',
+        message: 'Tudo sob controle neste mês.',
       ));
     }
     if (lowest.date != null && lowest.balance >= 0) {
@@ -642,7 +650,7 @@ class FinanceEngine {
         severity: InsightSeverity.info,
         title: 'Ponto de menor saldo',
         message:
-            '${DateHelpers.weekdayNames[lowest.date!.weekday - 1]} será o ponto de menor saldo do período (${_brl(lowest.balance)}).',
+            '${DateHelpers.weekdayNames[lowest.date!.weekday - 1]} será o ponto de menor saldo do mês (${_brl(lowest.balance)}).',
       ));
     }
     if (lowest.balance < 0) {
@@ -669,22 +677,21 @@ class FinanceEngine {
       }
     }
 
-    // Assinaturas previstas na semana.
-    final subsThisWeek = subscriptions.where((s) {
+    // Assinaturas previstas no mês.
+    final subsThisMonth = subscriptions.where((s) {
       final d = DateHelpers.dateOnly(s.nextChargeDate);
-      return !d.isBefore(today) && !d.isAfter(end);
+      return !d.isBefore(start) && !d.isAfter(end);
     }).length;
-    if (subsThisWeek > 0) {
+    if (subsThisMonth > 0) {
       insights.add(Insight(
         severity: InsightSeverity.info,
         title: 'Assinaturas',
         message:
-            'Você possui $subsThisWeek assinatura${subsThisWeek > 1 ? 's' : ''} prevista${subsThisWeek > 1 ? 's' : ''} nesta semana.',
+            'Você possui $subsThisMonth assinatura${subsThisMonth > 1 ? 's' : ''} prevista${subsThisMonth > 1 ? 's' : ''} neste mês.',
       ));
     }
 
     return RadarData(
-      days: days,
       paymentsCount: paymentsCount,
       paymentsCents: payments,
       receiptsCents: receipts,

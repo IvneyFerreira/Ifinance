@@ -560,8 +560,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: _radarStat(
                   context,
-                  'Próximos ${radar.days} dias',
-                  '${radar.paymentsCount} contas',
+                  'Este mês',
+                  '${radar.paymentsCount} contas a pagar',
                   Icons.event_note_outlined,
                   AppColors.info,
                 ),

@@ -109,7 +109,6 @@ class Insight {
 
 /// Dados do Radar Financeiro (cap. 11).
 class RadarData {
-  final int days;
   final int paymentsCount;
   final int paymentsCents;
   final int receiptsCents;
@@ -117,7 +116,6 @@ class RadarData {
   final int nextIncomeCents;
   final List<Insight> insights;
   const RadarData({
-    required this.days,
     required this.paymentsCount,
     required this.paymentsCents,
     required this.receiptsCents,

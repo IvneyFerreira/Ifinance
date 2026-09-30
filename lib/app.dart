@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/models/models.dart';
@@ -28,6 +29,15 @@ class IFinanceApp extends StatelessWidget {
             AppThemeMode.dark => ThemeMode.dark,
             AppThemeMode.system => ThemeMode.system,
           },
+          // Datas no padrão brasileiro em TODO o app, inclusive nos diálogos do
+          // sistema (date picker, etc.): pt-BR como idioma e localidade fixos.
+          locale: const Locale('pt', 'BR'),
+          supportedLocales: const [Locale('pt', 'BR')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           home: _Root(controller: controller),
         );
       },

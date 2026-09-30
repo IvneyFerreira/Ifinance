@@ -21,8 +21,8 @@ bool _initialized = false;
 
 const AndroidNotificationDetails _androidDetails = AndroidNotificationDetails(
   'ifinance_lembretes',
-  'Lembretes de vencimento',
-  channelDescription: 'Avisos de contas a vencer e vencidas',
+  'Lembretes de contas e recebimentos',
+  channelDescription: 'Avisos de contas a vencer e valores a receber',
   importance: Importance.high,
   priority: Priority.high,
   icon: '@mipmap/ic_launcher',

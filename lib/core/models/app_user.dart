@@ -26,6 +26,7 @@ class AppUser {
   });
 
   AppUser copyWith({
+    String? id,
     String? name,
     String? email,
     String? passwordHash,
@@ -36,7 +37,7 @@ class AppUser {
     bool? deleted,
   }) {
     return AppUser(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,

@@ -409,4 +409,47 @@ void main() {
       expect(BackupService.listFor(userId), isEmpty);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Restauração de backup completo (recriação de conta) — cap. 42/73
+  // ---------------------------------------------------------------------------
+  group('Restauração de backup (recria usuário + dados)', () {
+    test('copyWith permite trocar o id (remap por e-mail)', () {
+      final now = DateTime.now();
+      final u = AppUser(
+        id: 'novo-id',
+        name: 'Ivney',
+        email: 'ivney@test.com',
+        passwordHash: 'h',
+        passwordSalt: 's',
+        createdAt: now,
+        updatedAt: now,
+      );
+      final remapped = u.copyWith(id: 'id-existente');
+      expect(remapped.id, 'id-existente');
+      expect(remapped.email, 'ivney@test.com');
+      expect(remapped.name, 'Ivney');
+    });
+
+    test('toMap/fromMap preserva os campos essenciais do usuário', () {
+      final now = DateTime.now();
+      final u = AppUser(
+        id: 'u1',
+        name: 'Ivney',
+        email: 'ivney@test.com',
+        passwordHash: 'hash',
+        passwordSalt: 'salt',
+        emailVerified: true,
+        onboardingCompleted: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final back = AppUser.fromMap(u.toMap());
+      expect(back.id, u.id);
+      expect(back.email, u.email);
+      expect(back.passwordHash, u.passwordHash);
+      expect(back.passwordSalt, u.passwordSalt);
+      expect(back.onboardingCompleted, isTrue);
+    });
+  });
 }

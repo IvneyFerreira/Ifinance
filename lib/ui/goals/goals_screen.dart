@@ -5,11 +5,13 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../budgets/budgets_screen.dart';
 import '../goals/goal_form_screen.dart';
 import '../shell/app_drawer.dart';
+import '../shell/quick_add.dart';
 
 /// Metas (cap. 27/28): progresso, quanto falta, prazo e contribuição mensal.
 class GoalsScreen extends StatelessWidget {
@@ -221,18 +223,11 @@ class _GoalCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: amount,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Valor (R\$)',
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                  ),
+                  MoneyField(controller: amount, label: 'Valor'),
                   const SizedBox(height: 18),
                   FilledButton(
                     onPressed: () async {
-                      final cents = Money.parse(amount.text);
+                      final cents = MoneyInput.parse(amount.text);
                       if (cents == null || cents <= 0) {
                         showToast(ctx, 'Informe um valor válido.', error: true);
                         return;

@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/quick_add.dart';
 
 /// Formulário de meta (cap. 27/28), incluindo Reserva de Emergência.
 class GoalFormScreen extends StatefulWidget {
@@ -93,23 +94,9 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _target,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Valor objetivo (R\$)',
-              prefixIcon: Icon(Icons.attach_money),
-            ),
-          ),
+          MoneyField(controller: _target, label: 'Valor objetivo'),
           const SizedBox(height: 14),
-          TextField(
-            controller: _accumulated,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Já acumulado (R\$)',
-              prefixIcon: Icon(Icons.savings_outlined),
-            ),
-          ),
+          MoneyField(controller: _accumulated, label: 'Já acumulado'),
           if (_type == GoalType.emergencyReserve) ...[
             const SizedBox(height: 14),
             Text('Meses de custo essencial desejados',
@@ -187,7 +174,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
   }
 
   Future<void> _save() async {
-    final target = Money.parse(_target.text);
+    final target = MoneyInput.parse(_target.text);
     if (_name.text.trim().isEmpty || target == null || target <= 0) {
       showToast(context, 'Informe nome e valor objetivo.', error: true);
       return;
@@ -200,7 +187,7 @@ class _GoalFormScreenState extends State<GoalFormScreen> {
       userId: c.user!.id,
       name: _name.text.trim(),
       targetCents: target,
-      accumulatedCents: Money.parse(_accumulated.text) ?? 0,
+      accumulatedCents: MoneyInput.parse(_accumulated.text) ?? 0,
       deadline: _deadline,
       type: _type,
       emergencyMonths: _type == GoalType.emergencyReserve ? _emergencyMonths : 0,

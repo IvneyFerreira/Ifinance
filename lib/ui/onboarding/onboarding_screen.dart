@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/quick_add.dart';
 
 /// Onboarding (cap. 51): guia o usuário em 7 etapas até "Seu IFinance está pronto".
 class OnboardingScreen extends StatefulWidget {
@@ -245,14 +246,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         _stepTitle('Informe o saldo atual',
             'Quanto existe hoje nesta conta.'),
-        TextField(
-          controller: _balance,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Saldo atual (R\$)',
-            prefixIcon: Icon(Icons.attach_money),
-          ),
-        ),
+        MoneyField(controller: _balance, label: 'Saldo atual'),
       ],
     );
   }
@@ -271,14 +265,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _incomeValue,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Valor (R\$)',
-            prefixIcon: Icon(Icons.attach_money),
-          ),
-        ),
+        MoneyField(controller: _incomeValue, label: 'Valor'),
       ],
     );
   }
@@ -297,14 +284,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _expenseValue,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Valor mensal (R\$)',
-            prefixIcon: Icon(Icons.attach_money),
-          ),
-        ),
+        MoneyField(controller: _expenseValue, label: 'Valor mensal'),
       ],
     );
   }
@@ -330,14 +310,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           onChanged: (v) => setState(() => _cardHasLimit = v),
         ),
         if (_cardHasLimit)
-          TextField(
-            controller: _cardLimit,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Limite (R\$)',
-              prefixIcon: Icon(Icons.attach_money),
-            ),
-          ),
+          MoneyField(controller: _cardLimit, label: 'Limite'),
       ],
     );
   }
@@ -356,14 +329,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _goalValue,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Valor alvo (R\$)',
-            prefixIcon: Icon(Icons.attach_money),
-          ),
-        ),
+        MoneyField(controller: _goalValue, label: 'Valor alvo'),
       ],
     );
   }
@@ -463,7 +429,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ));
         break;
       case 2:
-        final cents = Money.parse(_balance.text);
+        final cents = MoneyInput.parse(_balance.text);
         final accs = controller.accounts;
         if (cents != null && accs.isNotEmpty) {
           final first = accs.first;
@@ -472,7 +438,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
         break;
       case 3:
-        final cents = Money.parse(_incomeValue.text);
+        final cents = MoneyInput.parse(_incomeValue.text);
         final accs = controller.accounts;
         if (cents != null && cents > 0 && accs.isNotEmpty) {
           final cat = _ensureCategory(controller, _incomeDesc.text, isIncome: true);
@@ -502,7 +468,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
         break;
       case 4:
-        final cents = Money.parse(_expenseValue.text);
+        final cents = MoneyInput.parse(_expenseValue.text);
         final accs = controller.accounts;
         if (cents != null && cents > 0 && accs.isNotEmpty) {
           final cat = _ensureCategory(controller, _expenseDesc.text, isIncome: false);
@@ -526,7 +492,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         final name = _cardName.text.trim().isEmpty
             ? 'Cartão principal'
             : _cardName.text.trim();
-        final limit = Money.parse(_cardLimit.text) ?? 0;
+        final limit = MoneyInput.parse(_cardLimit.text) ?? 0;
         await controller.saveCard(CreditCard(
           id: controller.repo.newId(),
           userId: controller.user!.id,
@@ -537,7 +503,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ));
         break;
       case 6:
-        final cents = Money.parse(_goalValue.text);
+        final cents = MoneyInput.parse(_goalValue.text);
         if (cents != null && cents > 0) {
           await controller.saveGoal(Goal(
             id: controller.repo.newId(),

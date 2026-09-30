@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/quick_add.dart';
 
 /// Contas (cap. 16): tipos, saldo atual, entradas e saídas no mês.
 class AccountsScreen extends StatelessWidget {
@@ -141,18 +143,11 @@ class AccountsScreen extends StatelessWidget {
                     style: Theme.of(ctx).textTheme.bodySmall?.copyWith(height: 1.35),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Novo saldo (R\$)',
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                  ),
+                  MoneyField(controller: controller, label: 'Novo saldo'),
                   const SizedBox(height: 18),
                   FilledButton(
                     onPressed: () async {
-                      final cents = Money.parse(controller.text);
+                      final cents = MoneyInput.parse(controller.text);
                       if (cents == null) {
                         showToast(ctx, 'Valor inválido.', error: true);
                         return;

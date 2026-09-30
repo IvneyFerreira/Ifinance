@@ -43,6 +43,38 @@ class DataScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+          FinancialCard(
+            color: AppColors.warning.withValues(alpha: 0.10),
+            border:
+                Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.warning, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Onde ficam seus dados?',
+                          style: t.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tudo fica guardado somente neste aparelho (nada vai para '
+                        'a nuvem). Por isso, ao DESINSTALAR o app ou trocar de '
+                        'celular os dados não vêm junto. Antes de fazer isso, '
+                        'gere um backup (JSON) aqui embaixo e guarde-o — depois '
+                        'basta usar "Restaurar de um backup" na tela de login.',
+                        style: t.bodySmall?.copyWith(height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (c.restoredFromSnapshot) ...[
             const SizedBox(height: 14),
             FinancialCard(

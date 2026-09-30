@@ -7,10 +7,12 @@ import '../../core/services/passkey_api.dart';
 import '../../core/services/passkey_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../assistant/assistant_screen.dart';
 import '../auth/two_factor_setup_screen.dart';
+import '../shell/quick_add.dart';
 import 'categories_screen.dart';
 
 /// Configurações (cap. 6/47/71/72): tema, margem de segurança, reserva;
@@ -217,9 +219,9 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Lembretes de vencimento'),
+                  title: const Text('Lembretes de contas e recebimentos'),
                   subtitle: const Text(
-                      'Avisa sobre contas a vencer e vencidas'),
+                      'Avisa sobre contas a vencer e valores a receber (salário, etc.)'),
                   value: s.remindersEnabled,
                   onChanged: (v) =>
                       c.setReminders(enabled: v).then((_) {
@@ -508,7 +510,7 @@ class SettingsScreen extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   Text(
-                      'Quantos dias antes do vencimento você quer ser avisado.',
+                      'Quantos dias antes do vencimento (ou do recebimento) você quer ser avisado.',
                       style: Theme.of(ctx).textTheme.bodySmall),
                   const SizedBox(height: 16),
                   Text('$value dia(s)',
@@ -711,8 +713,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _editReserve(BuildContext context, AppController c, UserSettings s) {
-    final controller =
-        TextEditingController(text: Money.formatPlain(s.protectedReserveCents));
+    final controller = TextEditingController(
+        text: MoneyInputFormatter.formatCents(s.protectedReserveCents));
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -744,18 +746,11 @@ class SettingsScreen extends StatelessWidget {
                       'Valor que não deve ser considerado como disponível para gastar.',
                       style: Theme.of(ctx).textTheme.bodySmall),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Valor (R\$)',
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                  ),
+                  MoneyField(controller: controller, label: 'Valor'),
                   const SizedBox(height: 18),
                   FilledButton(
                     onPressed: () {
-                      final cents = Money.parse(controller.text) ?? 0;
+                      final cents = MoneyInput.parse(controller.text) ?? 0;
                       c.updateSettings(s.copyWith(protectedReserveCents: cents));
                       Navigator.pop(ctx);
                     },

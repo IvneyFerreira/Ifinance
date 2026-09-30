@@ -2,13 +2,16 @@ name: ifinance
 description: "IFinance — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
 publish_to: 'none'
 
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.9.2
 
 dependencies:
   flutter:
+    sdk: flutter
+  # Localização pt-BR dos componentes do Material/Cupertino (date picker em português)
+  flutter_localizations:
     sdk: flutter
 
   cupertino_icons: ^1.0.8

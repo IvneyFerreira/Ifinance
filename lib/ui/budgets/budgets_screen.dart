@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/quick_add.dart';
 
 /// Orçamentos (cap. 26): limites mensais por categoria, consumido, restante,
 /// percentual utilizado.
@@ -153,18 +155,11 @@ class BudgetsScreen extends StatelessWidget {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: amount,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Limite mensal (R\$)',
-                        prefixIcon: Icon(Icons.attach_money),
-                      ),
-                    ),
+                    MoneyField(controller: amount, label: 'Limite mensal'),
                     const SizedBox(height: 18),
                     FilledButton(
                       onPressed: () async {
-                        final cents = Money.parse(amount.text);
+                        final cents = MoneyInput.parse(amount.text);
                         if (cents == null || cents <= 0 || categoryId == null) {
                           showToast(ctx, 'Preencha categoria e valor.',
                               error: true);

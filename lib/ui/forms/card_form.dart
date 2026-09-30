@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/money.dart';
+import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/quick_add.dart';
 
 /// Formulário de cartão (cap. 18): nome, instituição, bandeira, final,
 /// limite, fechamento, vencimento, cor.
@@ -113,11 +114,7 @@ class _CardFormScreenState extends State<CardFormScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: _limit,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Limite (R\$)'),
-                ),
+                child: MoneyField(controller: _limit, label: 'Limite'),
               ),
             ],
           ),
@@ -226,7 +223,7 @@ class _CardFormScreenState extends State<CardFormScreen> {
       institution: _institution.text.trim(),
       brand: _brand,
       lastDigits: _lastDigits.text.trim(),
-      limitCents: Money.parse(_limit.text) ?? 0,
+      limitCents: MoneyInput.parse(_limit.text) ?? 0,
       closingDay: _closingDay,
       dueDay: _dueDay,
       colorValue: _color,

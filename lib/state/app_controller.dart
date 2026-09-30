@@ -683,11 +683,24 @@ class AppController extends ChangeNotifier {
       if (due.isAfter(horizon)) continue;
 
       final overdue = due.isBefore(today);
-      final title = overdue
-          ? 'Conta vencida: ${t.description}'
-          : 'Vence em breve: ${t.description}';
+      // Data no padrão brasileiro (dd/MM/yyyy) nas mensagens.
+      final dateLabel = DateHelpers.fullDate.format(due);
       final dateKey = DateHelpers.isoDate(t.dueDate);
-      final message = '${Money.format(t.amountCents)} • vencimento $dateKey';
+      final String title;
+      final String message;
+      if (t.isIncome) {
+        // RECEITA não é conta a vencer: é um valor A RECEBER.
+        // Ex.: salário jamais "vence" — ele é previsto/recebido.
+        title = overdue
+            ? 'Receita atrasada: ${t.description}'
+            : 'A receber: ${t.description}';
+        message = '${Money.format(t.amountCents)} • previsto para $dateLabel';
+      } else {
+        title = overdue
+            ? 'Conta vencida: ${t.description}'
+            : 'Conta a vencer: ${t.description}';
+        message = '${Money.format(t.amountCents)} • vencimento $dateLabel';
+      }
 
       // Agenda notificação nativa com antecedência (08:00 do dia configurado).
       final remindAt = due
@@ -1599,7 +1612,11 @@ class AppController extends ChangeNotifier {
     ) async {
       final list = (data[key] as List?) ?? const [];
       for (final raw in list) {
-        await col.put(fromMap(Map<String, dynamic>.from(raw as Map)));
+        final record = Map<String, dynamic>.from(raw as Map);
+        // Garante que todo registro pertença ao usuário atual — evita órfãos
+        // quando o backup vem de outro id (ex.: mesma conta em outro aparelho).
+        if (record.containsKey('userId')) record['userId'] = uid;
+        await col.put(fromMap(record));
         count++;
       }
     }
@@ -1630,6 +1647,66 @@ class AppController extends ChangeNotifier {
     await repo.log(uid, 'restore', 'Backup', details: '$count registros');
     await refresh();
     return count;
+  }
+
+  /// Restaura um backup COMPLETO a partir do texto JSON.
+  ///
+  /// Diferente de [restoreBackup], este método também **recria a conta do
+  /// usuário** (nome, e-mail e senha) a partir do backup — útil após
+  /// reinstalar o app ou trocar de aparelho, quando o armazenamento local está
+  /// vazio e o login ainda não existe. Funciona ANTES de autenticar.
+  ///
+  /// Retorna a quantidade de registros restaurados, ou 0 se o backup for
+  /// inválido (não contém o bloco 'data').
+  Future<int> restoreFromBackupJson(Map<String, dynamic> json) async {
+    final data = json['data'] ?? json;
+    if (data is! Map) return 0;
+    final map = Map<String, dynamic>.from(data);
+
+    // 1) Recria/reaproveita a conta do usuário do backup.
+    final userMap = map['user'];
+    if (userMap is! Map) return 0;
+    var user = AppUser.fromMap(Map<String, dynamic>.from(userMap));
+    // Se já existir uma conta com o mesmo e-mail, reaproveita o id existente
+    // para não criar duplicatas e não órfãos os dados.
+    final existing = repo.users
+        .all()
+        .where((u) => !u.deleted && u.email.toLowerCase() == user.email.toLowerCase());
+    if (existing.isNotEmpty) {
+      user = user.copyWith(id: existing.first.id);
+    }
+    await repo.users.put(user);
+
+    final settingsMap = map['settings'];
+    if (settingsMap is Map) {
+      await repo.settings
+          .put(UserSettings.fromMap(Map<String, dynamic>.from(settingsMap)));
+    } else {
+      await repo.settings.put(UserSettings(userId: user.id));
+    }
+
+    // 2) Toma a sessão deste usuário e carrega as coleções.
+    auth.restoreSession(user.id);
+    _user = user;
+    await _persistSession(user.id);
+    await _loadUserData();
+
+    // 3) Importa as coleções do backup (substitui o conjunto atual do usuário).
+    final count = await restoreBackup(map);
+    _beginAutoBackup();
+    await _seedDefaultCategoriesIfEmpty();
+    _restoredFromSnapshot = true;
+    notifyListeners();
+    return count;
+  }
+
+  /// Garante que o usuário tenha ao menos as categorias padrão.
+  Future<void> _seedDefaultCategoriesIfEmpty() async {
+    if (_user == null) return;
+    if (categories.isNotEmpty) return;
+    await _seedDefaultCategories();
+    categories = repo.categories.byUser(_user!.id);
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------
