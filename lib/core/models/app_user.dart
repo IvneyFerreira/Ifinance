@@ -97,6 +97,12 @@ class UserSettings {
   final int essentialMonthlyCostCents;
   /// Moeda (BRL inicial).
   final String currency;
+  /// Bloqueio do app por PIN (cap. 71 - segurança).
+  final bool lockEnabled;
+  /// Hash do PIN (salt::pin com SHA-256 iterado). Nunca guarda o PIN em texto.
+  final String pinHash;
+  /// Salt do PIN.
+  final String pinSalt;
 
   const UserSettings({
     required this.userId,
@@ -106,6 +112,9 @@ class UserSettings {
     this.excludeInvestmentsFromDailyBalance = true,
     this.essentialMonthlyCostCents = 0,
     this.currency = 'BRL',
+    this.lockEnabled = false,
+    this.pinHash = '',
+    this.pinSalt = '',
   });
 
   UserSettings copyWith({
@@ -115,6 +124,9 @@ class UserSettings {
     bool? excludeInvestmentsFromDailyBalance,
     int? essentialMonthlyCostCents,
     String? currency,
+    bool? lockEnabled,
+    String? pinHash,
+    String? pinSalt,
   }) {
     return UserSettings(
       userId: userId,
@@ -127,6 +139,9 @@ class UserSettings {
       essentialMonthlyCostCents:
           essentialMonthlyCostCents ?? this.essentialMonthlyCostCents,
       currency: currency ?? this.currency,
+      lockEnabled: lockEnabled ?? this.lockEnabled,
+      pinHash: pinHash ?? this.pinHash,
+      pinSalt: pinSalt ?? this.pinSalt,
     );
   }
 
@@ -139,6 +154,9 @@ class UserSettings {
             excludeInvestmentsFromDailyBalance,
         'essentialMonthlyCostCents': essentialMonthlyCostCents,
         'currency': currency,
+        'lockEnabled': lockEnabled,
+        'pinHash': pinHash,
+        'pinSalt': pinSalt,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -155,5 +173,8 @@ class UserSettings {
         essentialMonthlyCostCents:
             (m['essentialMonthlyCostCents'] as num?)?.toInt() ?? 0,
         currency: (m['currency'] as String?) ?? 'BRL',
+        lockEnabled: (m['lockEnabled'] as bool?) ?? false,
+        pinHash: (m['pinHash'] as String?) ?? '',
+        pinSalt: (m['pinSalt'] as String?) ?? '',
       );
 }

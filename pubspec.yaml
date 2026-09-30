@@ -25,6 +25,8 @@ dependencies:
   crypto: ^3.0.6
   # IA real do Assessor (cliente HTTP)
   http: ^1.5.0
+  pdf: ^3.12.0
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:

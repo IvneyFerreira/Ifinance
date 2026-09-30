@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/report_pdf.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/category_icons.dart';
 import '../../core/utils/date_helpers.dart';
@@ -209,6 +211,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         title: const Text('Relatórios'),
         actions: [
           IconButton(
+            tooltip: 'Exportar PDF',
+            onPressed: () => _exportPdf(context, c),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+          ),
+          IconButton(
             tooltip: 'Exportar CSV',
             onPressed: () => _exportCsv(context, c),
             icon: const Icon(Icons.ios_share),
@@ -405,6 +412,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
             style: t.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w800, color: color)),
       ],
+    );
+  }
+
+  Future<void> _exportPdf(BuildContext context, AppController c) async {
+    final bytes = await ReportPdf.build(
+      engine: c.engine,
+      transactions: c.transactions,
+      categories: c.categories,
+      userName: c.user?.name ?? '',
+      months: _months,
+    );
+    await Printing.layoutPdf(
+      name: 'ifinance-relatorio-${_months}m.pdf',
+      onLayout: (_) => bytes,
     );
   }
 

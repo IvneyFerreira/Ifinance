@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/models/models.dart';
 import 'core/theme/app_theme.dart';
 import 'state/app_controller.dart';
+import 'ui/auth/lock_screen.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/onboarding/onboarding_screen.dart';
 import 'ui/shell/app_shell.dart';
@@ -34,12 +35,39 @@ class IFinanceApp extends StatelessWidget {
   }
 }
 
-class _Root extends StatelessWidget {
+class _Root extends StatefulWidget {
   final AppController controller;
   const _Root({required this.controller});
 
   @override
+  State<_Root> createState() => _RootState();
+}
+
+class _RootState extends State<_Root> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-bloqueia ao sair do app (proteção de privacidade — cap. 71).
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      widget.controller.lockNow();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     if (controller.loading) {
       return const _Splash();
     }
@@ -48,6 +76,9 @@ class _Root extends StatelessWidget {
     }
     if (!(controller.user?.onboardingCompleted ?? false)) {
       return const OnboardingScreen();
+    }
+    if (controller.locked) {
+      return const LockScreen();
     }
     return const AppShell();
   }

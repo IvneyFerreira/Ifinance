@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -102,6 +104,7 @@ class AppController extends ChangeNotifier {
     }
     _themeMode = _settings.themeMode;
     Money.setSymbol(_symbolFor(_settings.currency));
+    _locked = _settings.lockEnabled;
 
     accounts = repo.accounts.byUser(uid);
     categories = repo.categories.byUser(uid);
@@ -288,6 +291,62 @@ class AppController extends ChangeNotifier {
         'EUR' => '€',
         _ => 'R\$',
       };
+
+  // ---------------------------------------------------------------------------
+  // Segurança — bloqueio por PIN (cap. 71)
+  // ---------------------------------------------------------------------------
+
+  bool _locked = false;
+  bool get locked => _locked;
+
+  /// Define (ou troca) o PIN e ativa o bloqueio.
+  Future<void> setPin(String pin) async {
+    final salt = _pinSalt();
+    final hash = _pinHash(pin, salt);
+    await updateSettings(
+        _settings.copyWith(lockEnabled: true, pinHash: hash, pinSalt: salt));
+  }
+
+  /// Desativa o bloqueio (remove PIN armazenado).
+  Future<void> disablePin() async {
+    await updateSettings(
+        _settings.copyWith(lockEnabled: false, pinHash: '', pinSalt: ''));
+    _locked = false;
+    notifyListeners();
+  }
+
+  bool verifyPin(String pin) {
+    if (!_settings.lockEnabled) return true;
+    return _pinHash(pin, _settings.pinSalt) == _settings.pinHash;
+  }
+
+  void lockNow() {
+    if (_settings.lockEnabled) {
+      _locked = true;
+      notifyListeners();
+    }
+  }
+
+  void unlockWithPin(String pin) {
+    if (verifyPin(pin)) {
+      _locked = false;
+      notifyListeners();
+    }
+  }
+
+  static String _pinSalt() {
+    final rnd = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    return base64UrlEncode(bytes);
+  }
+
+  static String _pinHash(String pin, String salt) {
+    var digest = sha256.convert(utf8.encode('$salt::pin::$pin'));
+    for (var i = 0; i < 6000; i++) {
+      digest = sha256.convert([...digest.bytes, ...utf8.encode(salt)]);
+    }
+    return digest.toString();
+  }
 
   // ---------------------------------------------------------------------------
   // Contas

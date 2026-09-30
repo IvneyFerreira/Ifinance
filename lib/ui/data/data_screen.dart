@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/services/report_pdf.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
@@ -55,7 +57,14 @@ class DataScreen extends StatelessWidget {
             onTap: () => _restore(context),
           ),
           const SizedBox(height: 16),
-          const SectionHeader(title: 'Exportar movimentações'),
+          const SectionHeader(title: 'Relatórios e planilhas'),
+          _tile(
+            context,
+            icon: Icons.picture_as_pdf_outlined,
+            title: 'Relatório em PDF',
+            subtitle: 'Resumo do período, fluxo mensal e categorias',
+            onTap: () => _exportPdf(context),
+          ),
           _tile(
             context,
             icon: Icons.table_chart_outlined,
@@ -112,6 +121,21 @@ class DataScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _exportPdf(BuildContext context) async {
+    final c = context.read<AppController>();
+    final bytes = await ReportPdf.build(
+      engine: c.engine,
+      transactions: c.transactions,
+      categories: c.categories,
+      userName: c.user?.name ?? '',
+      months: 6,
+    );
+    await Printing.layoutPdf(
+      name: 'ifinance-relatorio.pdf',
+      onLayout: (_) => bytes,
     );
   }
 

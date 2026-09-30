@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
@@ -89,6 +90,36 @@ class SettingsScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const CategoriesScreen()))),
           ),
           const SizedBox(height: 22),
+          SectionHeader(title: 'Segurança'),
+          FinancialCard(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Bloqueio por PIN'),
+                  subtitle: Text(s.lockEnabled
+                      ? 'Protege o app ao abrir'
+                      : 'Peça um PIN para abrir o app'),
+                  value: s.lockEnabled,
+                  onChanged: (v) => _toggleLock(context, c, s, v),
+                ),
+                if (s.lockEnabled) ...[
+                  const Divider(height: 20),
+                  _row(context, 'Alterar PIN', 'Trocar',
+                      onTap: () => _setPin(context, c, changing: true)),
+                  const Divider(height: 20),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.lock_clock, color: AppColors.emerald),
+                    title: const Text('Bloquear agora'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => c.lockNow(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
           SectionHeader(title: 'Conta'),
           FinancialCard(
             child: Column(
@@ -166,6 +197,81 @@ class SettingsScreen extends StatelessWidget {
                 style: t.bodySmall),
           ),
         ],
+      ),
+    );
+  }
+
+  void _toggleLock(
+      BuildContext context, AppController c, UserSettings s, bool value) {
+    if (value) {
+      _setPin(context, c);
+    } else {
+      c.disablePin();
+      showToast(context, 'Bloqueio desativado.');
+    }
+  }
+
+  void _setPin(BuildContext context, AppController c, {bool changing = false}) {
+    final pinCtrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          ),
+          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(changing ? 'Alterar PIN' : 'Definir PIN',
+                    style: Theme.of(ctx)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('Use de 4 a 6 dígitos.', style: Theme.of(ctx).textTheme.bodySmall),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pinCtrl,
+                  autofocus: true,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                      labelText: 'PIN', counterText: ''),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () async {
+                    final pin = pinCtrl.text;
+                    if (pin.length < 4) {
+                      showToast(ctx, 'O PIN deve ter ao menos 4 dígitos.',
+                          error: true);
+                      return;
+                    }
+                    await c.setPin(pin);
+                    if (ctx.mounted) {
+                      Navigator.pop(ctx);
+                      showToast(context, 'PIN configurado.');
+                    }
+                  },
+                  child: const Text('Salvar PIN'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
