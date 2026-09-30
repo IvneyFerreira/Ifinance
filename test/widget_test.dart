@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ifinance/core/services/totp_service.dart';
 import 'package:ifinance/core/utils/money.dart';
 import 'package:ifinance/core/utils/money_input_formatter.dart';
 
@@ -78,6 +79,41 @@ void main() {
       }
       expect(value.text, '12,99');
       expect(MoneyInput.parse(value.text), 1299);
+    });
+  });
+
+  group('TotpService — 2FA (RFC 6238)', () {
+    test('segredo Base32 gera códigos de 6 dígitos', () {
+      final secret = TotpService.generateSecret();
+      final code = TotpService.code(secret);
+      expect(code.length, 6);
+      expect(int.tryParse(code), isNotNull);
+    });
+
+    test('verify aceita o código atual e rejeita o errado', () {
+      final secret = TotpService.generateSecret();
+      final now = DateTime.now();
+      final code = TotpService.code(secret, now: now);
+      expect(TotpService.verify(secret, code, now: now), isTrue);
+      expect(TotpService.verify(secret, '000000', now: now),
+          code == '000000' ? isTrue : isFalse);
+    });
+
+    test('vetor conhecido RFC 6238 (SHA1, 8 dígitos adaptado p/ 6)', () {
+      // Segredo de teste "12345678901234567890" em Base32 = GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+      const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+      // Em 1970-01-01 00:00:59 UTC o TOTP SHA1 (8 díg.) é 94287082.
+      final t = DateTime.utc(1970, 1, 1, 0, 0, 59);
+      final code = TotpService.code(secret, now: t);
+      expect(code, '287082'); // 6 dígitos = últimos 6 do vetor
+    });
+
+    test('otpauth URI contém segredo e issuer', () {
+      final uri = TotpService.otpauthUri(
+          secret: 'ABC234', account: 'user@test.com', issuer: 'IFinance');
+      expect(uri.startsWith('otpauth://totp/'), isTrue);
+      expect(uri.contains('secret=ABC234'), isTrue);
+      expect(uri.contains('IFinance'), isTrue);
     });
   });
 }

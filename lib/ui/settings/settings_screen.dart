@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../auth/two_factor_setup_screen.dart';
 import 'categories_screen.dart';
 
 /// Configurações (cap. 6/47/71/72): tema, margem de segurança, reserva;
@@ -114,6 +115,46 @@ class SettingsScreen extends StatelessWidget {
                     title: const Text('Bloquear agora'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => c.lockNow(),
+                  ),
+                ],
+                const Divider(height: 20),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Autenticação em 2 fatores'),
+                  subtitle: Text(s.twoFactorEnabled
+                      ? 'Ativa (app autenticador)'
+                      : 'Proteja o login com um código temporário'),
+                  value: s.twoFactorEnabled,
+                  onChanged: (v) => _toggleTwoFactor(context, c, v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          SectionHeader(title: 'Lembretes'),
+          FinancialCard(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Lembretes de vencimento'),
+                  subtitle: const Text(
+                      'Avisa sobre contas a vencer e vencidas'),
+                  value: s.remindersEnabled,
+                  onChanged: (v) =>
+                      c.setReminders(enabled: v).then((_) {
+                    if (v && context.mounted) {
+                      showToast(context, 'Lembretes ativados.');
+                    }
+                  }),
+                ),
+                if (s.remindersEnabled) ...[
+                  const Divider(height: 20),
+                  _row(
+                    context,
+                    'Avisar com antecedência',
+                    '${s.reminderDaysBefore} dia(s)',
+                    onTap: () => _editReminderDays(context, c, s),
                   ),
                 ],
               ],
@@ -273,6 +314,91 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _toggleTwoFactor(BuildContext context, AppController c, bool value) {
+    if (value) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TwoFactorSetupScreen()),
+      );
+    } else {
+      showConfirmDialog(
+        context,
+        title: 'Desativar 2FA',
+        message:
+            'Sem a verificação em duas etapas, sua conta fica menos protegida. Deseja continuar?',
+        confirmLabel: 'Desativar',
+        destructive: true,
+      ).then((ok) async {
+        if (!context.mounted) return;
+        if (ok) {
+          await c.disableTwoFactor();
+          if (context.mounted) showToast(context, '2FA desativado.');
+        }
+      });
+    }
+  }
+
+  void _editReminderDays(
+      BuildContext context, AppController c, UserSettings s) {
+    int value = s.reminderDaysBefore;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(builder: (ctx, setSheet) {
+          return Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.xl)),
+            ),
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Antecedência do lembrete',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(
+                      'Quantos dias antes do vencimento você quer ser avisado.',
+                      style: Theme.of(ctx).textTheme.bodySmall),
+                  const SizedBox(height: 16),
+                  Text('$value dia(s)',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  Slider(
+                    value: value.toDouble(),
+                    min: 1,
+                    max: 10,
+                    divisions: 9,
+                    label: '$value',
+                    onChanged: (v) => setSheet(() => value = v.round()),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      c.setReminders(daysBefore: value);
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Salvar'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        });
+      },
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/services/auth_service.dart';
@@ -23,8 +24,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _totp = TextEditingController();
   bool _obscure = true;
   bool _busy = false;
+  bool _needTotp = false;
   String? _error;
 
   @override
@@ -33,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
+    _totp.dispose();
     super.dispose();
   }
 
@@ -45,10 +49,14 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       switch (_mode) {
         case _Mode.login:
-          await controller.login(
+          final done = await controller.login(
             email: _email.text,
             password: _password.text,
           );
+          if (!done && mounted) {
+            // 2FA habilitado: pede o segundo fator.
+            setState(() => _needTotp = true);
+          }
           break;
         case _Mode.register:
           if (_password.text != _confirm.text) {
@@ -80,8 +88,32 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _submitTotp() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final ok = await context.read<AppController>().confirmTwoFactor(_totp.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      setState(() => _error = 'Código inválido. Tente novamente.');
+      _totp.clear();
+    }
+  }
+
+  void _cancelTotp() {
+    context.read<AppController>().cancelTwoFactor();
+    setState(() {
+      _needTotp = false;
+      _error = null;
+      _totp.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_needTotp) return _buildTotp();
     final t = Theme.of(context).textTheme;
     return Scaffold(
       body: SafeArea(
@@ -226,8 +258,82 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  String _title() => switch (_mode) {
-        _Mode.login => 'Bem-vindo de volta',
+  Widget _buildTotp() {
+    final t = Theme.of(context).textTheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                          colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(Icons.verified_user_outlined,
+                        color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 24),
+                  Text('Verificação em 2 etapas',
+                      style:
+                          t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Abra seu app autenticador e digite o código de 6 dígitos.',
+                    style: t.bodyMedium,
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _totp,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textAlign: TextAlign.center,
+                    style: t.headlineSmall?.copyWith(letterSpacing: 8),
+                    onSubmitted: (_) => _submitTotp(),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: '000000',
+                      errorText: _error,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  FilledButton(
+                    onPressed: _busy ? null : _submitTotp,
+                    child: _busy
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Confirmar'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: _busy ? null : _cancelTotp,
+                    child: const Text('Voltar'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _title() => switch (_mode) {        _Mode.login => 'Bem-vindo de volta',
         _Mode.register => 'Criar sua conta',
         _Mode.forgot => 'Recuperar senha',
       };

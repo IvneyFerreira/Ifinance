@@ -103,6 +103,14 @@ class UserSettings {
   final String pinHash;
   /// Salt do PIN.
   final String pinSalt;
+  /// Autenticação em dois fatores por TOTP (app autenticador) — cap. 71.
+  final bool twoFactorEnabled;
+  /// Segredo TOTP em base32. Nunca exposto em texto na UI após configurado.
+  final String totpSecret;
+  /// Lembretes de vencimento ativados (notificações locais).
+  final bool remindersEnabled;
+  /// Dias de antecedência para o lembrete de vencimento.
+  final int reminderDaysBefore;
 
   const UserSettings({
     required this.userId,
@@ -115,6 +123,10 @@ class UserSettings {
     this.lockEnabled = false,
     this.pinHash = '',
     this.pinSalt = '',
+    this.twoFactorEnabled = false,
+    this.totpSecret = '',
+    this.remindersEnabled = false,
+    this.reminderDaysBefore = 3,
   });
 
   UserSettings copyWith({
@@ -127,6 +139,10 @@ class UserSettings {
     bool? lockEnabled,
     String? pinHash,
     String? pinSalt,
+    bool? twoFactorEnabled,
+    String? totpSecret,
+    bool? remindersEnabled,
+    int? reminderDaysBefore,
   }) {
     return UserSettings(
       userId: userId,
@@ -142,6 +158,10 @@ class UserSettings {
       lockEnabled: lockEnabled ?? this.lockEnabled,
       pinHash: pinHash ?? this.pinHash,
       pinSalt: pinSalt ?? this.pinSalt,
+      twoFactorEnabled: twoFactorEnabled ?? this.twoFactorEnabled,
+      totpSecret: totpSecret ?? this.totpSecret,
+      remindersEnabled: remindersEnabled ?? this.remindersEnabled,
+      reminderDaysBefore: reminderDaysBefore ?? this.reminderDaysBefore,
     );
   }
 
@@ -157,6 +177,10 @@ class UserSettings {
         'lockEnabled': lockEnabled,
         'pinHash': pinHash,
         'pinSalt': pinSalt,
+        'twoFactorEnabled': twoFactorEnabled,
+        'totpSecret': totpSecret,
+        'remindersEnabled': remindersEnabled,
+        'reminderDaysBefore': reminderDaysBefore,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -176,5 +200,9 @@ class UserSettings {
         lockEnabled: (m['lockEnabled'] as bool?) ?? false,
         pinHash: (m['pinHash'] as String?) ?? '',
         pinSalt: (m['pinSalt'] as String?) ?? '',
+        twoFactorEnabled: (m['twoFactorEnabled'] as bool?) ?? false,
+        totpSecret: (m['totpSecret'] as String?) ?? '',
+        remindersEnabled: (m['remindersEnabled'] as bool?) ?? false,
+        reminderDaysBefore: (m['reminderDaysBefore'] as num?)?.toInt() ?? 3,
       );
 }

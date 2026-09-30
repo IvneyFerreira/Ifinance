@@ -13,6 +13,7 @@ import '../core/models/models.dart';
 import '../core/services/auth_service.dart';
 import '../core/services/seed_service.dart';
 import '../core/services/statement_importer.dart';
+import '../core/services/totp_service.dart';
 import '../core/utils/category_icons.dart';
 import '../core/utils/date_helpers.dart';
 import '../core/utils/money.dart';
@@ -156,8 +157,47 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> login({required String email, required String password}) async {
+  /// Usuário autenticado por senha aguardando o segundo fator (2FA/TOTP).
+  AppUser? _pendingTotpUser;
+  AppUser? get pendingTwoFactorUser => _pendingTotpUser;
+
+  /// Login em dois passos:
+  /// - Se o usuário NÃO tem 2FA: conclui e retorna true.
+  /// - Se tem 2FA: guarda o usuário pendente e retorna false
+  ///   (a UI deve chamar [confirmTwoFactor]).
+  Future<bool> login({required String email, required String password}) async {
     final user = await auth.login(email: email, password: password);
+    final userSettings = repo.settings.findById(user.id);
+    if (userSettings != null && userSettings.twoFactorEnabled) {
+      _pendingTotpUser = user;
+      notifyListeners();
+      return false;
+    }
+    await _completeLogin(user);
+    return true;
+  }
+
+  /// Conclui o segundo fator (código TOTP). Retorna true se válido.
+  Future<bool> confirmTwoFactor(String code) async {
+    final pending = _pendingTotpUser;
+    if (pending == null) return false;
+    final s = repo.settings.findById(pending.id);
+    if (s == null || !s.twoFactorEnabled) {
+      await _completeLogin(pending);
+      return true;
+    }
+    if (!TotpService.verify(s.totpSecret, code)) return false;
+    await _completeLogin(pending);
+    return true;
+  }
+
+  void cancelTwoFactor() {
+    _pendingTotpUser = null;
+    notifyListeners();
+  }
+
+  Future<void> _completeLogin(AppUser user) async {
+    _pendingTotpUser = null;
     _user = user;
     await _persistSession(user.id);
     await _loadUserData();
@@ -196,6 +236,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout() async {
     auth.logout();
+    _pendingTotpUser = null;
     _user = null;
     _settings = const UserSettings(userId: '');
     accounts = [];
@@ -390,6 +431,106 @@ class AppController extends ChangeNotifier {
   Future<void> deleteAttachment(Attachment att) async {
     await repo.attachments.delete(att.id);
     await repo.log(_user!.id, 'detach', 'Attachment', entityId: att.id);
+    await refresh();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Autenticação em dois fatores — TOTP (cap. 71)
+  // ---------------------------------------------------------------------------
+
+  bool get twoFactorEnabled => _settings.twoFactorEnabled;
+
+  /// Gera um novo segredo e a URL otpauth:// para o QR Code.
+  /// A ativação só acontece após confirmar um código válido ([enableTwoFactor]).
+  ({String secret, String uri}) beginTwoFactorSetup() {
+    final secret = TotpService.generateSecret();
+    final uri = TotpService.otpauthUri(
+      secret: secret,
+      account: _user?.email ?? 'usuario',
+      issuer: 'IFinance',
+    );
+    return (secret: secret, uri: uri);
+  }
+
+  /// Ativa o 2FA após validar o primeiro código do autenticador.
+  Future<bool> enableTwoFactor(String secret, String code) async {
+    if (!TotpService.verify(secret, code)) return false;
+    await updateSettings(_settings.copyWith(
+      twoFactorEnabled: true,
+      totpSecret: secret,
+    ));
+    await repo.log(_user!.id, '2fa_enabled', 'User', entityId: _user!.id);
+    return true;
+  }
+
+  Future<void> disableTwoFactor() async {
+    await updateSettings(
+        _settings.copyWith(twoFactorEnabled: false, totpSecret: ''));
+    await repo.log(_user!.id, '2fa_disabled', 'User', entityId: _user!.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lembretes de vencimento (cap. 44) — central in-app + gatilho p/ push
+  // ---------------------------------------------------------------------------
+
+  bool get remindersEnabled => _settings.remindersEnabled;
+
+  Future<void> setReminders({bool? enabled, int? daysBefore}) async {
+    await updateSettings(_settings.copyWith(
+      remindersEnabled: enabled ?? _settings.remindersEnabled,
+      reminderDaysBefore: daysBefore ?? _settings.reminderDaysBefore,
+    ));
+    if (_settings.remindersEnabled) await regenerateReminders();
+  }
+
+  /// Recalcula os lembretes de contas a vencer/vencidas e os persiste na
+  /// central de notificações, evitando duplicatas.
+  Future<int> regenerateReminders() async {
+    if (_user == null) return 0;
+    final uid = _user!.id;
+    final now = DateTime.now();
+    final today = DateHelpers.dateOnly(now);
+    final horizon =
+        today.add(Duration(days: _settings.reminderDaysBefore));
+
+    final existing = repo.notifications.byUser(uid);
+    var created = 0;
+
+    for (final t in transactions) {
+      if (t.deleted || t.isTransfer || t.isInvoicePayment) continue;
+      if (t.isPaid) continue;
+      if (t.isIncome && t.incomeStatus == IncomeStatus.received) continue;
+      if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
+      final due = DateHelpers.dateOnly(t.dueDate);
+      if (due.isAfter(horizon)) continue;
+
+      final overdue = due.isBefore(today);
+      final title = overdue
+          ? 'Conta vencida: ${t.description}'
+          : 'Vence em breve: ${t.description}';
+      final dateKey = DateHelpers.isoDate(t.dueDate);
+
+      final dupe = existing.any((n) =>
+          n.title == title && n.message.contains(dateKey));
+      if (dupe) continue;
+
+      await repo.notifications.put(AppNotification(
+        id: repo.newId(),
+        userId: uid,
+        title: title,
+        message: '${Money.format(t.amountCents)} • vencimento $dateKey',
+        severity:
+            overdue ? InsightSeverity.warning : InsightSeverity.info,
+        date: now,
+      ));
+      created++;
+    }
+    if (created > 0) await refresh();
+    return created;
+  }
+
+  Future<void> clearNotifications() async {
+    await repo.notifications.clearUser(_user!.id);
     await refresh();
   }
 
@@ -1075,6 +1216,7 @@ class AppController extends ChangeNotifier {
       changed = true;
     }
     if (changed) await refresh();
+    if (_settings.remindersEnabled) await regenerateReminders();
   }
 
   // ---------------------------------------------------------------------------
