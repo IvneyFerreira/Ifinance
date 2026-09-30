@@ -20,6 +20,44 @@ import '../wealth/wealth_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  /// Diálogo para editar o nome do usuário (persistido no banco).
+  Future<void> _editName(BuildContext context, AppController c) async {
+    final controller = TextEditingController(text: c.user?.name ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar nome'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Seu nome',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final saved = await c.updateUserName(controller.text);
+    if (!context.mounted) return;
+    if (saved) {
+      showToast(context, 'Nome atualizado.');
+    } else {
+      showToast(context, 'Informe um nome válido.', error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
@@ -37,6 +75,7 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         children: [
           FinancialCard(
+            onTap: () => _editName(context, c),
             child: Row(
               children: [
                 Container(
@@ -101,6 +140,8 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                const Icon(Icons.edit_outlined,
+                    size: 18, color: AppColors.gray400),
               ],
             ),
           ),

@@ -235,14 +235,28 @@ class FinanceEngine {
   /// Saldo disponível − compromissos do horizonte − reservas protegidas −
   /// margem de segurança. Receitas futuras NÃO são tratadas como dinheiro
   /// disponível hoje (cap. 65).
+  ///
+  /// A margem é aplicada sobre o valor que SOBRA depois de pagar os
+  /// compromissos (denominado "disponível livre"), e não sobre o saldo bruto —
+  /// assim, quem já pagou todas as contas pode gastar o que sobra, guardando
+  /// apenas a margem sobre esse restante.
   int getSafeAvailableBalance({required DateTime until}) {
     final available = getCurrentBalance();
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final margin =
-        Money.applyPercent(available, settings.safetyMarginPercent);
-    final safe = available - committed - reserves - margin;
+    final free = available - committed - reserves;
+    final margin = Money.applyPercent(free, settings.safetyMarginPercent);
+    final safe = free - margin;
     return safe;
+  }
+
+  /// Valor da margem de segurança aplicada (sobre o disponível livre).
+  int safetyMarginValue({required DateTime until}) {
+    final available = getCurrentBalance();
+    final committed = getCommittedAmount(until: until);
+    final reserves = settings.protectedReserveCents;
+    final free = available - committed - reserves;
+    return Money.applyPercent(free, settings.safetyMarginPercent);
   }
 
   /// Explicação detalhada do saldo livre (cap. 39).
@@ -250,9 +264,9 @@ class FinanceEngine {
     final available = getCurrentBalance();
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final margin =
-        Money.applyPercent(available, settings.safetyMarginPercent);
-    final result = available - committed - reserves - margin;
+    final free = available - committed - reserves;
+    final margin = Money.applyPercent(free, settings.safetyMarginPercent);
+    final result = free - margin;
     return CalcExplanation(
       title: 'Saldo livre seguro',
       components: [
@@ -263,7 +277,7 @@ class FinanceEngine {
           CalcComponent('Reservas protegidas', reserves, isSubtraction: true),
         if (margin > 0)
           CalcComponent(
-              'Margem de segurança (${settings.safetyMarginPercent.toStringAsFixed(0)}%)',
+              'Margem de segurança (${settings.safetyMarginPercent.toStringAsFixed(0)}% sobre o que sobra)',
               margin,
               isSubtraction: true),
       ],
@@ -695,25 +709,54 @@ class FinanceEngine {
   // ---------------------------------------------------------------------------
 
   /// "Quanto posso gastar?" (cap. 38): margem livre considerando compromissos
-  /// antes da próxima receita e margem configurada.
+  /// antes da próxima receita e margem configurada (sobre o que sobra).
   Map<String, dynamic> assistantSafeToSpend() {
     final next = getNextIncome();
     final until = next?.date ?? DateHelpers.endOfMonth(DateTime.now());
     final available = getCurrentBalance();
     final committed = getCommittedAmount(until: until);
-    final margin = Money.applyPercent(available, settings.safetyMarginPercent);
     final reserves = settings.protectedReserveCents;
-    final free = available - committed - reserves - margin;
+    final free = available - committed - reserves;
+    final margin = Money.applyPercent(free, settings.safetyMarginPercent);
     return {
       'available': available,
       'committed': committed,
       'margin': margin,
       'reserves': reserves,
-      'free': free,
+      'free': free - margin,
       'until': until,
       'nextIncome': next?.amount ?? 0,
       'nextIncomeDate': next?.date,
     };
+  }
+
+  /// Sugestão de quanto investir por mês (cap. 63).
+  ///
+  /// Base: resultado do mês + sobra livre após compromissos. Sugere 20% do
+  /// que sobra (poupança saudável), limitado a nunca ultrapassar o valor
+  /// efetivamente livre. Retorna também uma faixa mínima/confortável.
+  int suggestedMonthlyInvestment() {
+    final until = DateHelpers.endOfMonth(DateTime.now());
+    final free = getSafeAvailableBalance(until: until);
+    final summary = getMonthlySummary();
+    // Base de poupança: o menor entre a sobra livre e o resultado positivo.
+    final base = free > 0 ? free : 0;
+    final resultPos = summary.resultCents > 0 ? summary.resultCents : 0;
+    final reference = base < resultPos ? base : resultPos;
+    if (reference <= 0) return 0;
+    return (reference * 0.20).round();
+  }
+
+  /// Faixa sugerida de investimento mensal: (mínimo, confortável).
+  (int min, int max) suggestedInvestmentRange() {
+    final until = DateHelpers.endOfMonth(DateTime.now());
+    final free = getSafeAvailableBalance(until: until);
+    final summary = getMonthlySummary();
+    final base = free > 0 ? free : 0;
+    final resultPos = summary.resultCents > 0 ? summary.resultCents : 0;
+    final reference = base < resultPos ? base : resultPos;
+    if (reference <= 0) return (0, 0);
+    return ((reference * 0.10).round(), (reference * 0.30).round());
   }
 
   Map<String, dynamic> assistantMonthOutlook() {

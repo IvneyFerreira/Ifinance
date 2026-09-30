@@ -358,6 +358,18 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Atualiza o nome do usuário atual (persistido no banco).
+  Future<bool> updateUserName(String name) async {
+    if (_user == null) return false;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    await auth.updateProfile(name: trimmed);
+    final updated = auth.currentUser;
+    if (updated != null) _user = updated;
+    notifyListeners();
+    return true;
+  }
+
   static String _symbolFor(String currency) => switch (currency) {
         'USD' => 'US\$',
         'EUR' => '€',

@@ -11,6 +11,7 @@ import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../shell/app_drawer.dart';
 import '../shell/quick_add.dart';
+import '../wealth/wealth_screen.dart';
 import '../widgets/charts.dart';
 
 /// Home / Dashboard (cap. 7, 8, 9, 11, 12, 87).
@@ -46,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _greeting(context, c),
                 const SizedBox(height: 20),
                 _safeAvailableBlock(context, engine, dashboard),
+                const SizedBox(height: 16),
+                _investSuggestion(context, engine),
                 const SizedBox(height: 16),
                 _horizonSelector(),
                 const SizedBox(height: 16),
@@ -249,6 +252,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   DateTime _horizonEnd(FinanceEngine e) => e.horizonEndDate(_horizon);
+
+  /// Sugestão de quanto investir por mês (cap. 63).
+  Widget _investSuggestion(BuildContext context, FinanceEngine engine) {
+    final t = Theme.of(context).textTheme;
+    final suggested = engine.suggestedMonthlyInvestment();
+    if (suggested <= 0) return const SizedBox.shrink();
+    final range = engine.suggestedInvestmentRange();
+    return FinancialCard(
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const WealthScreen())),
+      child: Row(
+        children: [
+          const CircleIcon(
+            icon: Icons.trending_up,
+            color: AppColors.emerald,
+            size: 42,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sugestão de investimento',
+                    style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    MoneyDisplay(suggested, fontSize: 22, colorize: false),
+                    const SizedBox(width: 6),
+                    Text('/mês', style: t.bodySmall),
+                  ],
+                ),
+                Text(
+                  'Faixa ideal: ${Money.formatCompact(range.$1)} a ${Money.formatCompact(range.$2)}',
+                  style: t.bodySmall?.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: AppColors.gray400),
+        ],
+      ),
+    );
+  }
 
   Widget _miniMetric(
     BuildContext context,
