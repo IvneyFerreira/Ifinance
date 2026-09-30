@@ -2,13 +2,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Configuração do servidor do Assessor IA (Opção B).
 ///
-/// O endereço base da API pode ser definido de três formas, em ordem de
-/// prioridade:
+/// O app **já sai configurado de fábrica**: aponta por padrão para o servidor
+/// público do IFinance, sem o usuário precisar colar nenhum endereço.
+///
+/// O endereço base da API é resolvido nesta ordem de prioridade:
 ///   1. **No próprio app** (Configurações → Assistente IA) — salvo em
 ///      SharedPreferences. Permite trocar de servidor SEM recompilar o APK.
 ///   2. **Compilação**: `--dart-define=ASSESSOR_API_BASE=https://...`
-///      (valor padrão embutido no build).
-///   3. **Mesma origem**: vazio (usa o host que serve o app web / preview).
+///      (sobrescreve o padrão de fábrica no build).
+///   3. **Padrão de fábrica** ([defaultBaseUrl]) — embutido no app.
 ///
 /// O `verifySsl` fica `true` por padrão; só é desativado pelo usuário em
 /// cenários de teste com certificado self-signed.
@@ -18,6 +20,11 @@ class AiConfig {
   static const _kBase = 'ifinance_ai_base_url';
   static const _kVerifySsl = 'ifinance_ai_verify_ssl';
   static const _kToken = 'ifinance_ai_token';
+
+  /// Servidor público padrão do Assessor IA (de fábrica, já embutido no app).
+  /// O usuário NÃO precisa colar nada — já vem pronto para usar.
+  static const String defaultBaseUrl =
+      'https://ifinance-assessor.onrender.com';
 
   /// Valor embutido no build via --dart-define (pode ser vazio).
   static const String compiledBaseUrl =
@@ -32,12 +39,20 @@ class AiConfig {
   static bool _verifySsl = true;
   static bool _loaded = false;
 
-  /// `true` quando há um servidor configurado (app ou compilação).
+  /// `true` quando há um servidor configurado (app, compilação ou padrão).
   static bool get isConfigured => baseUrl.isNotEmpty;
 
+  /// `true` quando o app está usando o servidor público padrão de fábrica.
+  static bool get isUsingDefault =>
+      _override.isEmpty && compiledBaseUrl.isEmpty;
+
   /// Endereço base efetivo (sem barra final).
+  ///
+  /// Prioridade: app (usuário) > compilação > padrão de fábrica.
   static String get baseUrl {
-    final raw = _override.isNotEmpty ? _override : compiledBaseUrl;
+    final raw = _override.isNotEmpty
+        ? _override
+        : (compiledBaseUrl.isNotEmpty ? compiledBaseUrl : defaultBaseUrl);
     return raw.trim().replaceAll(RegExp(r'/+$'), '');
   }
 
@@ -93,6 +108,6 @@ class AiConfig {
   static String describe() {
     if (_override.isNotEmpty) return 'Personalizado';
     if (compiledBaseUrl.isNotEmpty) return 'Embutido no app';
-    return 'Mesma origem (não configurado)';
+    return 'Servidor padrão IFinance';
   }
 }

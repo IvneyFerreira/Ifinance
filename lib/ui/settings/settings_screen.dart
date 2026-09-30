@@ -747,11 +747,16 @@ class _AiServerCardState extends State<_AiServerCard> {
   @override
   void initState() {
     super.initState();
+    // Mostra o endereço efetivo: usuário > compilação > padrão de fábrica.
     _ctrl.text = AiConfig.userBaseUrl.isNotEmpty
         ? AiConfig.userBaseUrl
-        : AiConfig.compiledBaseUrl;
+        : (AiConfig.compiledBaseUrl.isNotEmpty
+            ? AiConfig.compiledBaseUrl
+            : AiConfig.defaultBaseUrl);
     _tokenCtrl.text = AiConfig.token;
     _verifySsl = AiConfig.verifySsl;
+    // Testa a conexão automaticamente ao abrir (o app já vem configurado).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _test());
   }
 
   @override
@@ -775,9 +780,23 @@ class _AiServerCardState extends State<_AiServerCard> {
         baseUrl: url, token: _tokenCtrl.text, verifySsl: _verifySsl);
     if (!mounted) return;
     setState(() {
-      _status = url.isEmpty ? 'Endereço limpo.' : 'Endereço salvo com sucesso.';
+      _status = url.isEmpty
+          ? 'Restaurado para o servidor padrão do IFinance.'
+          : 'Endereço salvo com sucesso.';
       _statusOk = true;
     });
+  }
+
+  /// Restaura o endereço padrão de fábrica (remove a personalização).
+  Future<void> _useDefault() async {
+    await AiConfig.save(baseUrl: '');
+    if (!mounted) return;
+    setState(() {
+      _ctrl.text = AiConfig.defaultBaseUrl;
+      _status = 'Servidor padrão do IFinance restaurado.';
+      _statusOk = true;
+    });
+    await _test();
   }
 
   Future<void> _test() async {
@@ -808,9 +827,10 @@ class _AiServerCardState extends State<_AiServerCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'O Assessor IA usa um servidor (que guarda a chave da IA). '
-            'Defina aqui o endereço do seu servidor — assim você troca de '
-            'servidor sem reinstalar o app.',
+            'O app já vem configurado com o servidor padrão do IFinance. '
+            'Você não precisa fazer nada — a IA funciona de imediato. Se '
+            'quiser usar um servidor próprio, troque o endereço abaixo (sem '
+            'reinstalar o app).',
             style: t.bodySmall?.copyWith(height: 1.35),
           ),
           const SizedBox(height: 12),
@@ -825,8 +845,19 @@ class _AiServerCardState extends State<_AiServerCard> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('Modo atual: ${AiConfig.describe()}', style: t.bodySmall),
-          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Modo atual: ${AiConfig.describe()}',
+                    style: t.bodySmall),
+              ),
+              TextButton.icon(
+                onPressed: _busy ? null : _useDefault,
+                icon: const Icon(Icons.restart_alt, size: 16),
+                label: const Text('Usar padrão'),
+              ),
+            ],
+          ),
           TextField(
             controller: _tokenCtrl,
             autocorrect: false,
