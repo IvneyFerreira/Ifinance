@@ -1,0 +1,47 @@
+# IFinance — Blueprint do Render (deploy em 1 clique)
+#
+# Como usar:
+#   1. Suba este repositório no GitHub.
+#   2. Em https://dashboard.render.com/blueprints clique em "New Blueprint Instance".
+#   3. Selecione o repositório. O Render lê este arquivo e cria o serviço.
+#   4. Preencha as variáveis marcadas com sync: false (sua chave da IA).
+#
+# Documentação: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: ifinance-assessor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # --- IA (compatível com OpenAI). A chave fica SÓ no servidor. ---
+      - key: OPENAI_BASE_URL
+        sync: false            # preencha no painel do Render
+      - key: OPENAI_API_KEY
+        sync: false            # preencha no painel do Render (segredo)
+      - key: IFINANCE_LLM_MODEL
+        value: gpt-4o-mini
+
+      # --- CORS: "*" libera qualquer origem (necessário p/ APK e web). ---
+      - key: IFINANCE_ALLOWED_ORIGINS
+        value: "*"
+
+      # --- Limite de requisições/min por IP (protege o custo da IA). ---
+      - key: IFINANCE_RATE_LIMIT
+        value: "30"
+
+      # --- Token opcional do app (recomendado p/ servidor público). ---
+      # Se preencher, o app deve enviar o mesmo valor em
+      # Configurações → Assistente IA → Token.
+      - key: IFINANCE_API_TOKEN
+        sync: false
+
+      # --- Porta (o Render injeta PORT; mantido como fallback). ---
+      - key: PORT
+        value: "5060"
+
+      - key: WEB_DIR
+        value: /app/build/web

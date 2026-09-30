@@ -1,0 +1,39 @@
+# IFinance — arquivos que NÃO devem entrar na imagem/contexto de build.
+# Mantém a imagem enxuta e evita vazar segredos.
+
+# Segredos (NUNCA enviar para a nuvem)
+.env
+.env.*
+passkeys.json
+passkeys.json.tmp
+android/key.properties
+android/release-key.jks
+*.jks
+*.keystore
+
+# Versionamento
+.git
+.gitignore
+
+# Artefatos de build do Flutter (o build web é referenciado à parte)
+.dart_tool/
+.pub-cache/
+.flutter-plugins-dependencies
+build/app/
+build/ios/
+build/linux/
+build/macos/
+build/windows/
+build/web/**/*.map
+
+# Caches grandes
+.gradle/
+**/.gradle/
+.packages
+
+# Documentação/ambiente dev
+*.md
+!DEPLOY_IA.md
+!DEPLOY_RENDER.md
+.idea/
+.vscode/
