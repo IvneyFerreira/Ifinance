@@ -63,6 +63,13 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
         state == AppLifecycleState.hidden) {
       widget.controller.lockNow();
     }
+    // Garante a foto automática dos dados quando o app sai de cena (cap. 73),
+    // para que nenhuma alteração recente se perca entre versões/atualizações.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      widget.controller.flushSnapshot();
+    }
   }
 
   @override

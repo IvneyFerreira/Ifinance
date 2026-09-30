@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -11,6 +12,7 @@ import '../core/db/collection.dart';
 import '../core/finance/finance_engine.dart';
 import '../core/models/models.dart';
 import '../core/services/auth_service.dart';
+import '../core/services/backup_service.dart';
 import '../core/services/seed_service.dart';
 import '../core/services/statement_importer.dart';
 import '../core/services/totp_service.dart';
@@ -98,11 +100,19 @@ class AppController extends ChangeNotifier {
         auth.restoreSession(userId);
         _user = auth.currentUser;
         await _loadUserData();
+        _beginAutoBackup();
+      } else if (existing == null) {
+        // A sessão aponta para um usuário que não existe mais. Isso indica
+        // que o armazenamento local foi limpo (comum no Web/PWA após
+        // atualização). Tentamos recuperar automaticamente dos snapshots.
+        await _recoverFromSnapshotIfEmpty();
       }
     }
     _bootstrapped = true;
     _loading = false;
     notifyListeners();
+    // Garante uma foto do estado bom logo após iniciar (em background).
+    unawaited(_autoSnapshot('auto'));
   }
 
   Future<void> _loadUserData() async {
@@ -146,6 +156,8 @@ class AppController extends ChangeNotifier {
     if (_user == null) return;
     await _loadUserData();
     notifyListeners();
+    // Com debounce: gera uma foto automática após qualquer alteração real.
+    _scheduleAutoSnapshot();
   }
 
   // ---------------------------------------------------------------------------
@@ -162,6 +174,7 @@ class AppController extends ChangeNotifier {
     await _persistSession(user.id);
     await _seedDefaultCategories();
     await _loadUserData();
+    _beginAutoBackup();
     notifyListeners();
   }
 
@@ -209,6 +222,7 @@ class AppController extends ChangeNotifier {
     _user = user;
     await _persistSession(user.id);
     await _loadUserData();
+    _beginAutoBackup();
     notifyListeners();
   }
 
@@ -232,6 +246,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     await _loadUserData();
+    _beginAutoBackup();
     notifyListeners();
   }
 
@@ -243,6 +258,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Garante uma última foto dos dados antes de encerrar a sessão.
+    await flushSnapshot();
+    _stopAutoBackup();
     auth.logout();
     _pendingTotpUser = null;
     _user = null;
@@ -266,7 +284,10 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> deleteAccount() async {
+    final uid = _user?.id;
     await auth.deleteAccount();
+    if (uid != null) await BackupService.clearFor(uid);
+    _stopAutoBackup();
     _user = null;
     await _persistSession(null);
     notifyListeners();
@@ -1599,9 +1620,146 @@ class AppController extends ChangeNotifier {
     return count;
   }
 
+  // ---------------------------------------------------------------------------
+  // Snapshots automáticos de segurança (cap. 73) — sobrevivência a limpeza de
+  // armazenamento (Web/PWA) e a atualizações que preservam o diretório do app.
+  // ---------------------------------------------------------------------------
+
+  Timer? _autoBackupTimer;
+  bool _restoredFromSnapshot = false;
+  bool _autoBackupArmed = false;
+  DateTime? _lastAutoSnapshotAt;
+
+  /// `true` quando a sessão atual foi recuperada automaticamente de um
+  /// snapshot (a UI pode avisar o usuário).
+  bool get restoredFromSnapshot => _restoredFromSnapshot;
+
+  DateTime? get lastAutoSnapshotAt => _lastAutoSnapshotAt;
+
+  /// Lista os snapshots locais do usuário atual (mais recentes primeiro).
+  List<BackupSnapshotInfo> listSnapshots() =>
+      _user == null ? const [] : BackupService.listFor(_user!.id);
+
+  int get snapshotStorageUsed =>
+      _user == null ? 0 : BackupService.storageUsedFor(_user!.id);
+
+  /// Agenda uma foto automática sempre que os dados mudam (com debounce).
+  void _scheduleAutoSnapshot() {
+    if (!_autoBackupArmed || _user == null) return;
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = Timer(
+        const Duration(milliseconds: 1200), () => unawaited(_autoSnapshot('auto')));
+  }
+
+  /// Cria um snapshot imediato dos dados do usuário atual.
+  Future<String?> snapshotNow({String reason = 'manual'}) async {
+    if (_user == null) return null;
+    final id = await BackupService.snapshotNow(
+      userId: _user!.id,
+      data: _snapshot(),
+      reason: reason,
+      force: true,
+    );
+    _lastAutoSnapshotAt = DateTime.now();
+    notifyListeners();
+    return id;
+  }
+
+  Future<void> deleteSnapshot(String id) async {
+    await BackupService.delete(id);
+    notifyListeners();
+  }
+
+  Future<void> clearSnapshots() async {
+    if (_user == null) return;
+    await BackupService.clearFor(_user!.id);
+    notifyListeners();
+  }
+
+  /// Restaura um snapshot local (substitui os dados do usuário atual).
+  /// Antes de restaurar, cria um snapshot 'pre-restore' como rede de segurança.
+  Future<int> restoreSnapshot(String snapshotId) async {
+    if (_user == null) return 0;
+    await BackupService.snapshotNow(
+      userId: _user!.id,
+      data: _snapshot(),
+      reason: 'pre-restore',
+      force: true,
+    );
+    final json = BackupService.read(snapshotId);
+    if (json == null) return 0;
+    final count = await restoreBackup(json);
+    _restoredFromSnapshot = true;
+    return count;
+  }
+
+  Future<void> _autoSnapshot(String reason) async {
+    if (!_autoBackupArmed || _user == null || !isAuthenticated) return;
+    final id = await BackupService.snapshotNow(
+      userId: _user!.id,
+      data: _snapshot(),
+      reason: reason,
+    );
+    if (id != null) _lastAutoSnapshotAt = DateTime.now();
+  }
+
+  /// Tenta recuperar os dados do usuário da última sessão a partir de um
+  /// snapshot local, quando o armazenamento voltou vazio após uma atualização.
+  Future<void> _recoverFromSnapshotIfEmpty() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString(_sessionKey);
+    if (userId == null) return;
+    final snapshots = BackupService.listFor(userId);
+    if (snapshots.isEmpty) return;
+    final data = BackupService.read(snapshots.first.id);
+    if (data == null) return;
+
+    // Recria usuário e preferências a partir do snapshot e refaz a sessão.
+    final userMap = data['user'];
+    if (userMap is Map) {
+      final u = AppUser.fromMap(Map<String, dynamic>.from(userMap));
+      await repo.users.put(u);
+    }
+    final settingsMap = data['settings'];
+    if (settingsMap is Map) {
+      await repo.settings
+          .put(UserSettings.fromMap(Map<String, dynamic>.from(settingsMap)));
+    }
+    final restoredUser = repo.users.findById(userId);
+    if (restoredUser == null) return;
+    auth.restoreSession(userId);
+    _user = restoredUser;
+    await _loadUserData();
+    _restoredFromSnapshot = true;
+  }
+
+  /// Ativa os snapshots automáticos para a sessão atual.
+  void _beginAutoBackup() {
+    _autoBackupArmed = true;
+    _autoBackupTimer?.cancel();
+  }
+
+  void _stopAutoBackup() {
+    _autoBackupArmed = false;
+    _autoBackupTimer?.cancel();
+  }
+
+  /// Chamado quando o app é pausado/oculto (ex.: Android ao sair) para garantir
+  /// que os últimos dados estejam salvos em um snapshot.
+  Future<void> flushSnapshot() async {
+    if (_autoBackupTimer?.isActive ?? false) {
+      _autoBackupTimer!.cancel();
+      await _autoSnapshot('auto');
+    } else {
+      await _autoSnapshot('auto');
+    }
+  }
+
   /// Redefine os dados financeiros do usuário (mantém a conta e recria categorias).
   Future<void> resetFinancialData() async {
     final uid = _user!.id;
+    // Rede de segurança: guarda o estado atual antes de apagar.
+    await snapshotNow(reason: 'pre-restore');
     for (final box in [
       repo.accounts,
       repo.categories,

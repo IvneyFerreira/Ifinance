@@ -119,6 +119,9 @@ class FinanceEngine {
     for (final t in transactions) {
       if (t.isTransfer) continue;
       if (t.creditCardId != null && !t.isInvoicePayment) continue; // compra cartão
+      // Lançamentos cancelados não movimentam (nem movimentarão) o caixa.
+      if (t.isIncome && t.incomeStatus == IncomeStatus.cancelled) continue;
+      if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
       final effectiveDate = t.paidAt ?? t.dueDate;
       final d = DateHelpers.dateOnly(effectiveDate);
       if (d.isBefore(fromD) || d.isAfter(toD)) continue;
@@ -155,23 +158,13 @@ class FinanceEngine {
       ));
     }
 
-    // 3) Recorrências (receitas/despesas) previstas, exceto as que tiverem
-    //    ocorrência real correspondente no período.
-    final realizedKeys = {
-      for (final t in transactions)
-        '${t.recurringRuleId ?? t.description}|${t.dueDate.toIso8601String().substring(0, 10)}'
-    };
+    // 3) Recorrências (receitas/despesas) previstas, exceto as que já tiverem
+    //    uma ocorrência real equivalente lançada no período (evita contar duas
+    //    vezes a mesma obrigação/receita).
     for (final rule in recurringRules) {
       for (final occ in RecurrenceMaterializer.occurrencesInWindow(
           rule, fromD, toD)) {
-        final key = '${rule.id}|${occ.toIso8601String().substring(0, 10)}';
-        if (realizedKeys.contains(key)) continue;
-        // Se já existe transação real da mesma regra na mesma data, ignora.
-        if (transactions.any((t) =>
-            t.recurringRuleId == rule.id &&
-            DateHelpers.isSameDay(t.dueDate, occ))) {
-          continue;
-        }
+        if (_isOccurrenceRealized(rule, occ)) continue;
         final amount =
             rule.type == TransactionType.income ? rule.amountCents : -rule.amountCents;
         events.add(CashEvent(
@@ -227,11 +220,7 @@ class FinanceEngine {
         if (rule.type != TransactionType.expense) continue;
         for (final occ in RecurrenceMaterializer.occurrencesInWindow(
             rule, from, untilD)) {
-          if (transactions.any((t) =>
-              t.recurringRuleId == rule.id &&
-              DateHelpers.isSameDay(t.dueDate, occ))) {
-            continue;
-          }
+          if (_isOccurrenceRealized(rule, occ)) continue;
           committed += rule.amountCents;
         }
       }
@@ -406,6 +395,8 @@ class FinanceEngine {
 
     for (final t in transactions) {
       if (t.isTransfer) continue;
+      if (t.isIncome && t.incomeStatus == IncomeStatus.cancelled) continue;
+      if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
       if (!DateHelpers.dateOnly(t.competenceDate).isAfter(end) &&
           !DateHelpers.dateOnly(t.competenceDate).isBefore(start)) {
         if (t.isIncome) {
@@ -458,6 +449,7 @@ class FinanceEngine {
       for (final t in transactions) {
         if (t.categoryId != b.categoryId) continue;
         if (!t.isExpense || t.isTransfer) continue;
+        if (t.expenseStatus == ExpenseStatus.cancelled) continue;
         if (DateHelpers.dateOnly(t.competenceDate).isBefore(start) ||
             DateHelpers.dateOnly(t.competenceDate).isAfter(end)) {
           continue;
@@ -492,6 +484,7 @@ class FinanceEngine {
       if (t.creditCardId != cardId || !t.isExpense) continue;
       if (t.isInvoicePayment) continue;
       if (t.purchaseId != null) continue; // parceladas via installments
+      if (t.expenseStatus == ExpenseStatus.cancelled) continue;
       if (DateHelpers.isSameMonth(t.competenceDate, refStart)) {
         total += t.amountCents;
       }
@@ -520,6 +513,7 @@ class FinanceEngine {
       if (t.creditCardId != cardId || !t.isExpense) continue;
       if (t.isInvoicePayment) continue;
       if (t.purchaseId != null) continue;
+      if (t.expenseStatus == ExpenseStatus.cancelled) continue;
       used += t.amountCents;
     }
     // Apenas parcelas futuras/não pagas contam para o limite utilizado.
@@ -866,6 +860,30 @@ class FinanceEngine {
   DateTime _safeDate(int year, int month, int day) {
     final maxDay = DateHelpers.daysInMonth(year, month);
     return DateTime(year, month, day.clamp(1, maxDay));
+  }
+
+  /// Uma ocorrência de recorrência é considerada "já realizada" quando existe
+  /// um lançamento real equivalente: vínculo explícito com a regra, OU mesma
+  /// descrição + mesmo valor + mesmo tipo numa janela de ±5 dias em torno da
+  /// ocorrência. Isso evita contar em dobro quando a recorrência também foi
+  /// lançada manualmente (sem `recurringRuleId`).
+  bool _isOccurrenceRealized(RecurringRule rule, DateTime occurrence) {
+    final occ = DateHelpers.dateOnly(occurrence);
+    final desc = rule.description.trim().toLowerCase();
+    for (final t in transactions) {
+      if (t.deleted || t.isTransfer) continue;
+      if (t.type != rule.type) continue;
+      if (t.isIncome && t.incomeStatus == IncomeStatus.cancelled) continue;
+      if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
+      final d = DateHelpers.dateOnly(t.dueDate);
+      if (d.difference(occ).inDays.abs() > 5) continue;
+      final sameRule = t.recurringRuleId == rule.id;
+      final sameDesc = desc.isNotEmpty &&
+          t.description.trim().toLowerCase() == desc &&
+          t.amountCents == rule.amountCents;
+      if (sameRule || sameDesc) return true;
+    }
+    return false;
   }
 
   static String _brl(int cents) => Money.format(cents);

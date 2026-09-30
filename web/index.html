@@ -31,6 +31,27 @@
 
   <title>IFinance</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Persistência de armazenamento (PWA): pede ao navegador para NÃO
+    // descartar o IndexedDB (Hive) nem o localStorage (preferências) sob
+    // pressão de armazenamento — principal causa de "dados sumindo" numa
+    // atualização no Web. No Android o espaço de dados é preservado.
+    (function () {
+      try {
+        if (navigator.storage && navigator.storage.persisted) {
+          navigator.storage.persisted().then(function (already) {
+            if (!already && navigator.storage.persist) {
+              navigator.storage.persist().then(function (granted) {
+                console.log('[IFinance] Armazenamento persistente:', granted);
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[IFinance] persist() indisponível:', e);
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- Passkeys (WebAuthn) — biblioteca JS requerida pelo pacote passkeys no Web. -->

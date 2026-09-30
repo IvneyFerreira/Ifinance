@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 /// Nomes das caixas (boxes) do Hive. Cada coleção é persistida como
@@ -26,19 +27,38 @@ class Db {
   static const String audits = 'audit_logs';
   static const String simulations = 'simulations';
   static const String attachments = 'attachments';
+  /// Caixa dedicada aos snapshots automáticos de segurança (cap. 73).
+  static const String backups = 'backup_snapshots';
 
   static const List<String> all = [
     users, settings, accounts, categories, transactions, cards, purchases,
     installments, invoices, recurring, budgets, goals, goalContributions,
     assets, liabilities, subscriptions, notifications, audits, simulations,
-    attachments,
+    attachments, backups,
   ];
 
   static Future<void> init() async {
     await Hive.initFlutter();
     for (final name in all) {
-      await Hive.openBox<Map>(name);
+      await _openSafe(name);
     }
+  }
+
+  /// Abre uma caixa de forma resiliente: se o arquivo estiver corrompido
+  /// (ex.: dados de uma versão anterior/legada), recria a caixa vazia —
+  /// nunca deixa uma caixa corrompida impedir o app de iniciar (cap. 73).
+  static Future<Box<Map>> _openSafe(String name) async {
+    try {
+      return await Hive.openBox<Map>(name);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Db] falha ao abrir "$name": $e');
+    }
+    // Último recurso: descarta o arquivo corrompido e recria vazio
+    // (os dados do usuário continuam recuperáveis via snapshots/backup).
+    try {
+      await Hive.deleteBoxFromDisk(name);
+    } catch (_) {}
+    return Hive.openBox<Map>(name);
   }
 
   static Box<Map> box(String name) => Hive.box<Map>(name);

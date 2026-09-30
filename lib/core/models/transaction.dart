@@ -189,52 +189,98 @@ class Transaction {
         'deleted': deleted,
       };
 
-  factory Transaction.fromMap(Map<String, dynamic> m) => Transaction(
-        id: m['id'] as String,
-        userId: m['userId'] as String,
-        accountId: m['accountId'] as String?,
-        categoryId: m['categoryId'] as String?,
-        creditCardId: m['creditCardId'] as String?,
-        isInvoicePayment: (m['isInvoicePayment'] as bool?) ?? false,
-        invoiceReferenceMonth: m['invoiceReferenceMonth'] != null
-            ? DateTime.tryParse(m['invoiceReferenceMonth'] as String)
-            : null,
-        type: TransactionType.values.firstWhere(
-          (e) => e.name == m['type'],
-          orElse: () => TransactionType.expense,
-        ),
-        description: (m['description'] as String?) ?? '',
-        amountCents: (m['amountCents'] as num?)?.toInt() ?? 0,
-        competenceDate:
-            DateTime.tryParse((m['competenceDate'] as String?) ?? '') ??
-                DateTime.now(),
-        dueDate: DateTime.tryParse((m['dueDate'] as String?) ?? '') ??
-            DateTime.now(),
-        paidAt: m['paidAt'] != null
-            ? DateTime.tryParse(m['paidAt'] as String)
-            : null,
-        expenseStatus: ExpenseStatus.values.firstWhere(
-          (e) => e.name == m['expenseStatus'],
-          orElse: () => ExpenseStatus.pending,
-        ),
-        incomeStatus: IncomeStatus.values.firstWhere(
-          (e) => e.name == m['incomeStatus'],
-          orElse: () => IncomeStatus.expected,
-        ),
-        paymentMethod: PaymentMethod.values.firstWhere(
-          (e) => e.name == m['paymentMethod'],
-          orElse: () => PaymentMethod.other,
-        ),
-        notes: (m['notes'] as String?) ?? '',
-        isTransfer: (m['isTransfer'] as bool?) ?? false,
-        transferGroupId: m['transferGroupId'] as String?,
-        purchaseId: m['purchaseId'] as String?,
-        isRecurringOccurrence: (m['isRecurringOccurrence'] as bool?) ?? false,
-        recurringRuleId: m['recurringRuleId'] as String?,
-        createdAt: DateTime.tryParse((m['createdAt'] as String?) ?? '') ??
-            DateTime.now(),
-        updatedAt: DateTime.tryParse((m['updatedAt'] as String?) ?? '') ??
-            DateTime.now(),
-        deleted: (m['deleted'] as bool?) ?? false,
-      );
+  /// Tolerante a dados legados: aceita tanto os nomes atuais
+  /// (`competenceDate`/`dueDate`) quanto os antigos (`date`/`time`) e nunca
+  /// lança por causa de um campo com tipo inesperado — um registro assim seria
+  /// descartado silenciosamente e pareceria "dados sumidos".
+  factory Transaction.fromMap(Map<String, dynamic> m) {
+    final id = _asString(m['id']);
+    if (id == null || id.isEmpty) {
+      throw const FormatException('Transaction sem id');
+    }
+    final comp = _parseDate(m['competenceDate']) ??
+        _parseDate(m['date']) ??
+        _parseDate(m['time']) ??
+        DateTime.now();
+    final due = _parseDate(m['dueDate']) ??
+        _parseDate(m['date']) ??
+        _parseDate(m['time']) ??
+        comp;
+    return Transaction(
+      id: id,
+      userId: _asString(m['userId']) ?? '',
+      accountId: _asString(m['accountId']),
+      categoryId: _asString(m['categoryId']),
+      creditCardId: _asString(m['creditCardId']),
+      isInvoicePayment: _asBool(m['isInvoicePayment']),
+      invoiceReferenceMonth: _parseDate(m['invoiceReferenceMonth']),
+      type: TransactionType.values.firstWhere(
+        (e) => e.name == m['type'],
+        orElse: () => TransactionType.expense,
+      ),
+      description: _asString(m['description']) ?? '',
+      amountCents: _asInt(m['amountCents']),
+      competenceDate: comp,
+      dueDate: due,
+      paidAt: _parseDate(m['paidAt']),
+      expenseStatus: ExpenseStatus.values.firstWhere(
+        (e) => e.name == m['expenseStatus'],
+        orElse: () => ExpenseStatus.pending,
+      ),
+      incomeStatus: IncomeStatus.values.firstWhere(
+        (e) => e.name == m['incomeStatus'],
+        orElse: () => IncomeStatus.expected,
+      ),
+      paymentMethod: PaymentMethod.values.firstWhere(
+        (e) => e.name == m['paymentMethod'],
+        orElse: () => PaymentMethod.other,
+      ),
+      notes: _asString(m['notes']) ?? '',
+      isTransfer: _asBool(m['isTransfer']),
+      transferGroupId: _asString(m['transferGroupId']),
+      purchaseId: _asString(m['purchaseId']),
+      isRecurringOccurrence: _asBool(m['isRecurringOccurrence']),
+      recurringRuleId: _asString(m['recurringRuleId']),
+      createdAt: _parseDate(m['createdAt']) ??
+          _parseDate(m['updatedAt']) ??
+          comp,
+      updatedAt: _parseDate(m['updatedAt']) ?? comp,
+      deleted: _asBool(m['deleted']),
+    );
+  }
+
+  static String? _asString(Object? v) {
+    if (v == null) return null;
+    if (v is String) return v;
+    return v.toString();
+  }
+
+  static int _asInt(Object? v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
+  static bool _asBool(Object? v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.toLowerCase();
+      return s == 'true' || s == '1';
+    }
+    return false;
+  }
+
+  static DateTime? _parseDate(Object? v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
+    if (v is num) return DateTime.fromMillisecondsSinceEpoch(v.toInt());
+    if (v is String) {
+      if (v.isEmpty) return null;
+      return DateTime.tryParse(v);
+    }
+    return null;
+  }
 }
