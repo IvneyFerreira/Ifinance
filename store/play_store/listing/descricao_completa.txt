@@ -1,0 +1,27 @@
+IFinance — Sua vida financeira sob controle.
+
+O IFinance é o seu centro de comando financeiro pessoal: organize despesas e entradas, acompanhe cartões e faturas, defina orçamentos e metas, e saiba exatamente quanto você pode gastar hoje com segurança.
+
+PRINCIPAIS RECURSOS
+
+• Painel inteligente: saldo livre seguro, comprometido até o fim do mês e projeção.
+• Despesas e entradas: registre tudo em segundos, com categorias e recorrências.
+• Cartões de crédito: faturas, parcelas e limite disponível em tempo real.
+• Orçamentos e metas: acompanhe o quanto falta e veja o progresso de cada objetivo.
+• Assinaturas: descubra o custo mensal e anual que você paga sem perceber.
+• Relatórios em PDF: exporte um resumo completo do seu mês.
+• Assessor financeiro com IA: respostas práticas sobre os seus gastos e entradas — os dados ficam sob o seu controle.
+• Comprovantes: anexe notas e recibos às movimentações.
+
+SEGURANÇA EM PRIMEIRO LUGAR
+
+• Bloqueio por PIN ao abrir o app.
+• Desbloqueio por biometria (digital ou rosto).
+• Verificação em duas etapas (2FA) com app autenticador.
+• Login sem senha por Passkey (WebAuthn) — entre com a sua digital ou rosto.
+• Seus dados financeiros ficam no seu dispositivo. Você no controle.
+
+FEITO PARA O DIA A DIA
+Sem planilhas complicadas. Uma interface limpa, rápida e pensada para você decidir melhor e economizar mais a cada mês.
+
+Comece agora a colocar o seu dinheiro em movimento — sob controle.

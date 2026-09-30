@@ -1,0 +1,10 @@
+O que há de novo (1.0.0)
+
+• Login sem senha com Passkey (WebAuthn): entre com a digital ou o rosto.
+• Autenticação em dois fatores (2FA) com app autenticador.
+• Desbloqueio por biometria quando o bloqueio por PIN está ativo.
+• Lembretes de vencimento com notificações nativas.
+• Anexe comprovantes (notas e recibos) às movimentações.
+• Relatórios financeiros em PDF.
+• Assessor financeiro com IA real (despesas e entradas).
+• Correções e melhorias de desempenho.

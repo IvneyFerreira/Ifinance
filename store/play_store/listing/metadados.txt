@@ -1,0 +1,11 @@
+Nome do app (30): IFinance
+Nome do desenvolvedor: IFinance
+Categoria: Finanças
+Tags: finanças pessoais, orçamento, controle de gastos, despesas, cartões
+E-mail de suporte: suporte@ifinance.app
+Site: https://ifinance.app
+Classificação de conteúdo: Livre
+Tipo de app: Aplicativo
+Preço: Gratuito
+País/região: Brasil (pt-BR)
+Contato de privacidade: https://ifinance.app/privacidade
