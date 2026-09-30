@@ -3,16 +3,24 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../state/app_controller.dart';
+import '../assistant/assistant_screen.dart';
 import '../dashboard/home_screen.dart';
 import '../goals/goals_screen.dart';
 import '../planning/planning_screen.dart';
 import '../profile/profile_screen.dart';
 import '../transactions/transactions_screen.dart';
 import 'quick_add.dart';
+import 'shell_controller.dart';
 
-/// Estrutura principal responsiva (cap. 5/6):
-/// - Mobile: menu inferior (Início, Movimentações, +, Planejar, Metas/Perfil)
-/// - Desktop: sidebar à esquerda
+/// Estrutura principal responsiva (cap. 5/6).
+///
+/// - Mobile: barra inferior com 6 áreas — Início, Movimentações, Assessor IA,
+///   Planejar, Metas e Perfil — além do botão central "+" e do menu (gaveta).
+/// - Desktop (>= 900px): sidebar à esquerda + FAB "Registrar".
+///
+/// O menu lateral ([AppDrawer]) é exposto por cada tela (via `drawer:`), o que
+/// faz o AppBar mostrar automaticamente o ícone de menu. A navegação entre abas
+/// é compartilhada por um [ShellController] disponível para toda a subárvore.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -21,11 +29,12 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 0;
+  late final ShellController _shell;
 
   static const _pages = <Widget>[
     HomeScreen(),
     TransactionsScreen(),
+    AssistantScreen(),
     PlanningScreen(),
     GoalsScreen(),
     ProfileScreen(),
@@ -34,6 +43,7 @@ class _AppShellState extends State<AppShell> {
   static const _destinations = <((IconData, IconData), String)>[
     ((Icons.home_outlined, Icons.home), 'Início'),
     ((Icons.swap_vert_outlined, Icons.swap_vert), 'Movimentações'),
+    ((Icons.auto_awesome_outlined, Icons.auto_awesome), 'Assessor IA'),
     ((Icons.calendar_month_outlined, Icons.calendar_month), 'Planejar'),
     ((Icons.flag_outlined, Icons.flag), 'Metas'),
     ((Icons.person_outline, Icons.person), 'Perfil'),
@@ -42,9 +52,16 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    _shell = ShellController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AppController>().syncNotifications();
     });
+  }
+
+  @override
+  void dispose() {
+    _shell.dispose();
+    super.dispose();
   }
 
   bool _isDesktop(BuildContext context) =>
@@ -52,79 +69,89 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = _isDesktop(context);
-    if (isDesktop) {
-      return Scaffold(
-        body: Row(
-          children: [
-            _Sidebar(
-              index: _index,
-              onSelect: (i) => setState(() => _index = i),
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(
-              child: IndexedStack(index: _index, children: _pages),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => showQuickAdd(context),
-          backgroundColor: AppColors.emerald,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.add),
-          label: const Text('Registrar'),
-        ),
-      );
-    }
+    return ChangeNotifierProvider<ShellController>.value(
+      value: _shell,
+      child: ListenableBuilder(
+        listenable: _shell,
+        builder: (context, _) {
+          final isDesktop = _isDesktop(context);
 
-    return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.emerald.withValues(alpha: 0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+          if (isDesktop) {
+            return Scaffold(
+              body: Row(
+                children: [
+                  _Sidebar(index: _shell.index, onSelect: _shell.select),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: IndexedStack(index: _shell.index, children: _pages),
+                  ),
+                ],
+              ),
+              floatingActionButton: FloatingActionButton.extended(
+                onPressed: () => showQuickAdd(context),
+                backgroundColor: AppColors.emerald,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.add),
+                label: const Text('Registrar'),
+              ),
+            );
+          }
+
+          // ---- Mobile ----
+          return Scaffold(
+            body: IndexedStack(index: _shell.index, children: _pages),
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerDocked,
+            floatingActionButton: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.emerald.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton(
+                onPressed: () => showQuickAdd(context),
+                backgroundColor: AppColors.emerald,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                child: const Icon(Icons.add, size: 30),
+              ),
             ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () => showQuickAdd(context),
-          backgroundColor: AppColors.emerald,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          child: const Icon(Icons.add, size: 30),
-        ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        padding: EdgeInsets.zero,
-        height: 66,
-        color: Theme.of(context).cardTheme.color,
-        notchMargin: 8,
-        shape: const CircularNotchedRectangle(),
-        child: Row(
-          children: [
-            _navHalf(0),
-            _navHalf(1),
-            const SizedBox(width: 64),
-            _navHalf(2),
-            _navHalf(3),
-          ],
-        ),
+            bottomNavigationBar: BottomAppBar(
+              padding: EdgeInsets.zero,
+              height: 68,
+              color: Theme.of(context).cardTheme.color,
+              notchMargin: 8,
+              shape: const CircularNotchedRectangle(),
+              child: Row(
+                children: [
+                  _navItem(0),
+                  _navItem(1),
+                  _navItem(2),
+                  const SizedBox(width: 64), // espaço para o botão central "+"
+                  _navItem(3),
+                  _navItem(4),
+                  _navItem(5),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _navHalf(int i) {
+  Widget _navItem(int i) {
     return Expanded(
       child: _NavItem(
         icon: _destinations[i].$1,
         label: _destinations[i].$2,
-        selected: _index == i,
-        onTap: () => setState(() => _index = i),
+        selected: _shell.index == i,
+        onTap: () => _shell.select(i),
       ),
     );
   }
@@ -155,8 +182,11 @@ class _NavItem extends StatelessWidget {
           Icon(selected ? icon.$2 : icon.$1, color: color, size: 24),
           const SizedBox(height: 2),
           Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 9.5,
                 color: color,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               )),
@@ -178,6 +208,7 @@ class _Sidebar extends StatelessWidget {
     final items = const [
       (Icons.dashboard_outlined, 'Visão Geral'),
       (Icons.swap_vert, 'Movimentações'),
+      (Icons.auto_awesome, 'Assessor IA'),
       (Icons.calendar_month_outlined, 'Planejar'),
       (Icons.flag_outlined, 'Metas'),
       (Icons.person_outline, 'Perfil'),
@@ -212,7 +243,8 @@ class _Sidebar extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text('IFinance',
-                      style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                      style:
+                          t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 ],
               ),
             ),

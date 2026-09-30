@@ -13,6 +13,7 @@ import '../data/data_screen.dart';
 import '../recurring/recurring_screen.dart';
 import '../settings/about_screen.dart';
 import '../settings/settings_screen.dart';
+import '../shell/app_drawer.dart';
 import '../wealth/wealth_screen.dart';
 
 /// Perfil / Hub de módulos (cap. 6): unidades de navegação e conta.
@@ -27,6 +28,7 @@ class ProfileScreen extends StatelessWidget {
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
+      drawer: appDrawerFor(context),
       appBar: AppBar(title: const Text('Perfil')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),

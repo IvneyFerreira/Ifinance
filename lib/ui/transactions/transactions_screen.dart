@@ -11,6 +11,7 @@ import '../forms/income_form.dart';
 import '../forms/transfer_form.dart';
 import '../widgets/attachment_section.dart';
 import '../widgets/transaction_tile.dart';
+import '../shell/app_drawer.dart';
 
 /// Movimentações (cap. 13): busca, filtros, período, categorias, contas,
 /// cartões, status, tipos. Agrupadas por dia.
@@ -49,6 +50,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return Scaffold(
+      drawer: appDrawerFor(context),
       appBar: AppBar(
         title: const Text('Movimentações'),
         actions: [

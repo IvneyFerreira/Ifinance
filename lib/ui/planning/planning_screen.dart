@@ -10,6 +10,7 @@ import '../calendar/calendar_screen.dart';
 import '../cards/cards_screen.dart';
 import '../simulator/simulator_screen.dart';
 import '../widgets/charts.dart';
+import '../shell/app_drawer.dart';
 
 /// Planejamento / Futuro Financeiro (cap. 24/25): horizontes 30d, 3m, 6m, 12m,
 /// saldo projetado, ponto de menor/maior saldo e gráfico de projeção.
@@ -33,6 +34,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
     final series = engine.buildProjectionSeries(until: until);
 
     return Scaffold(
+      drawer: appDrawerFor(context),
       appBar: AppBar(title: const Text('Planejamento')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),

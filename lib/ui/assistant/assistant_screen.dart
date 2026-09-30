@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/assessor_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/app_controller.dart';
+import '../shell/app_drawer.dart';
 
 /// IFinance Assessor (cap. 36-39): assistente FINANCEIRO com IA real.
 ///
@@ -126,6 +127,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: appDrawerFor(context),
       appBar: AppBar(
         title: const Text('IFinance Assessor'),
         bottom: PreferredSize(

@@ -9,6 +9,7 @@ import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../budgets/budgets_screen.dart';
 import '../goals/goal_form_screen.dart';
+import '../shell/app_drawer.dart';
 
 /// Metas (cap. 27/28): progresso, quanto falta, prazo e contribuição mensal.
 class GoalsScreen extends StatelessWidget {
@@ -21,6 +22,7 @@ class GoalsScreen extends StatelessWidget {
     final goals = c.goals.where((g) => !g.archived).toList();
 
     return Scaffold(
+      drawer: appDrawerFor(context),
       appBar: AppBar(
         title: const Text('Metas'),
         actions: [
