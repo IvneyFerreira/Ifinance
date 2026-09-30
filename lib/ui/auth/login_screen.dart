@@ -356,15 +356,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
+                  TextButton.icon(
                     onPressed: _busy ? null : _restoreFromBackup,
-                    icon: const Icon(Icons.restore),
-                    label: const Text('Restaurar de um backup'),
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: const Text('Restaurar de um arquivo de backup'),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    'Trocou de aparelho ou reinstalou? Cole aqui o backup (JSON) '
-                    'que você exportou para voltar com sua conta e seus dados.',
+                    'Trocou de aparelho ou reinstalou? Cole o backup (JSON) '
+                    'exportado na tela Importar/Exportar para voltar com seus dados.',
                     textAlign: TextAlign.center,
                     style: t.bodySmall,
                   ),

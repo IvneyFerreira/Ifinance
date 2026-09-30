@@ -12,6 +12,9 @@ class DateHelpers {
   static final DateFormat weekdayShort = DateFormat('EEE', 'pt_BR');
   static final DateFormat iso = DateFormat('yyyy-MM-dd');
 
+  /// Hora no padrão brasileiro ("14:35").
+  static final DateFormat time = DateFormat('HH:mm', 'pt_BR');
+
   /// "2026-03-12" (para CSV/backup).
   static String isoDate(DateTime d) => iso.format(dateOnly(d));
 
