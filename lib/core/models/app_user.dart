@@ -119,6 +119,10 @@ class UserSettings {
   /// Identificador estável do dispositivo usado como nome de usuário
   /// WebAuthn (armazenado no servidor Relying Party).
   final String passkeyDeviceId;
+  /// Backup automático na nuvem ativado (cap. 73).
+  final bool cloudBackupEnabled;
+  /// Última sincronização bem-sucedida com a nuvem.
+  final DateTime? cloudBackupAt;
 
   const UserSettings({
     required this.userId,
@@ -138,6 +142,8 @@ class UserSettings {
     this.biometricEnabled = false,
     this.passkeyEnabled = false,
     this.passkeyDeviceId = '',
+    this.cloudBackupEnabled = true,
+    this.cloudBackupAt,
   });
 
   UserSettings copyWith({
@@ -157,6 +163,8 @@ class UserSettings {
     bool? biometricEnabled,
     bool? passkeyEnabled,
     String? passkeyDeviceId,
+    bool? cloudBackupEnabled,
+    DateTime? cloudBackupAt,
   }) {
     return UserSettings(
       userId: userId,
@@ -179,6 +187,8 @@ class UserSettings {
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       passkeyEnabled: passkeyEnabled ?? this.passkeyEnabled,
       passkeyDeviceId: passkeyDeviceId ?? this.passkeyDeviceId,
+      cloudBackupEnabled: cloudBackupEnabled ?? this.cloudBackupEnabled,
+      cloudBackupAt: cloudBackupAt ?? this.cloudBackupAt,
     );
   }
 
@@ -201,6 +211,8 @@ class UserSettings {
         'biometricEnabled': biometricEnabled,
         'passkeyEnabled': passkeyEnabled,
         'passkeyDeviceId': passkeyDeviceId,
+        'cloudBackupEnabled': cloudBackupEnabled,
+        'cloudBackupAt': cloudBackupAt?.toIso8601String(),
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -227,5 +239,7 @@ class UserSettings {
         biometricEnabled: (m['biometricEnabled'] as bool?) ?? false,
         passkeyEnabled: (m['passkeyEnabled'] as bool?) ?? false,
         passkeyDeviceId: (m['passkeyDeviceId'] as String?) ?? '',
+        cloudBackupEnabled: (m['cloudBackupEnabled'] as bool?) ?? true,
+        cloudBackupAt: DateTime.tryParse((m['cloudBackupAt'] as String?) ?? ''),
       );
 }

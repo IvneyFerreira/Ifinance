@@ -87,6 +87,82 @@ PASSKEY_STORE_PATH = os.environ.get(
 PASSKEY_ENABLED = bool(wa and PASSKEY_RP_ID)
 PASSKEY_STORE = wa.PasskeyStore(PASSKEY_STORE_PATH) if PASSKEY_ENABLED else None
 
+# --- Backup automático na nuvem (cap. 73) -----------------------------------
+# Guarda um "envelope" CIFRADO por conta (AES-GCM, chave derivada da senha do
+# usuário). O servidor NUNCA consegue ler o conteúdo — apenas armazena o blob.
+SYNC_ENABLED = os.environ.get("IFINANCE_SYNC_ENABLED", "1").lower() not in (
+    "0", "false", "no", "")
+SYNC_STORE_PATH = os.environ.get(
+    "IFINANCE_SYNC_STORE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync_store.json"),
+)
+# Limite de tamanho por backup (bytes do JSON). Evita abuso de disco/memória.
+SYNC_MAX_BYTES = int(os.environ.get("IFINANCE_SYNC_MAX_BYTES", str(8 * 1024 * 1024)))
+
+
+class SyncStore:
+    """Armazém simples (arquivo JSON) de backups cifrados por conta."""
+
+    def __init__(self, path: str):
+        self.path = path
+        self._lock = threading.Lock()
+        self._data = {}
+        self._load()
+
+    def _load(self):
+        if os.path.isfile(self.path):
+            try:
+                with open(self.path, "r", encoding="utf-8") as fh:
+                    self._data = json.load(fh)
+            except Exception:
+                self._data = {}
+        if not isinstance(self._data, dict):
+            self._data = {}
+
+    def _save(self):
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(self._data, fh, ensure_ascii=False)
+        os.replace(tmp, self.path)
+
+    @staticmethod
+    def valid_account_id(account_id: str) -> bool:
+        return bool(account_id) and account_id.isalnum() and 16 <= len(account_id) <= 128
+
+    def info(self, account_id: str):
+        with self._lock:
+            entry = self._data.get(account_id)
+        if not entry:
+            return {"exists": False}
+        blob = entry.get("envelope", {}).get("blob", "")
+        return {
+            "exists": True,
+            "updatedAt": entry.get("updatedAt"),
+            "size": len(blob),
+        }
+
+    def save(self, account_id: str, envelope: dict):
+        with self._lock:
+            self._data[account_id] = {
+                "envelope": envelope,
+                "updatedAt": datetime.utcnow().isoformat() + "Z",
+                "savedAt": int(time.time()),
+            }
+            self._save()
+
+    def load(self, account_id: str):
+        with self._lock:
+            entry = self._data.get(account_id)
+        if not entry:
+            return None
+        return entry.get("envelope")
+
+    def snapshot(self):
+        return {"accounts": len(self._data), "path": os.path.basename(self.path)}
+
+
+SYNC_STORE = SyncStore(SYNC_STORE_PATH) if SYNC_ENABLED else None
+
 _rate_lock = threading.Lock()
 _rate_buckets = {}  # ip -> [window_start_ts, count]
 
@@ -280,6 +356,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "rate_limit_per_min": RATE_LIMIT,
                 "auth_required": bool(API_TOKEN),
                 "passkeys_enabled": PASSKEY_ENABLED,
+                "cloud_backup_enabled": SYNC_ENABLED,
             })
             return
         if self.path.startswith("/api/passkey/health"):
@@ -289,6 +366,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "origins": PASSKEY_ORIGINS,
                 "store": PASSKEY_STORE.snapshot() if PASSKEY_STORE else None,
             })
+            return
+        if self.path.startswith("/api/sync/"):
+            self._handle_sync_get(self.path)
             return
         if self.path.startswith("/.well-known/assetlinks.json"):
             body = wa.assetlinks_json(
@@ -315,6 +395,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith("/api/passkey/"):
             self._handle_passkey(self.path)
+            return
+        if self.path.startswith("/api/sync/"):
+            self._handle_sync_post(self.path)
             return
         if not self.path.startswith("/api/assessor"):
             self._send_json(404, {"error": "not found"})
@@ -374,6 +457,72 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(502, {"error": f"IA indisponível ({e.code}). {detail}"})
         except Exception as e:
             self._send_json(502, {"error": f"Falha ao consultar a IA: {str(e)[:200]}"})
+
+    # --- Backup na nuvem (sync) --------------------------------------------- #
+    def _handle_sync_get(self, path):
+        if not SYNC_ENABLED:
+            self._send_json(503, {"enabled": False, "error": "Backup na nuvem desativado."})
+            return
+        from urllib.parse import urlparse, parse_qs
+        query = parse_qs(urlparse(path).query)
+
+        if path.startswith("/api/sync/health"):
+            self._send_json(200, {"enabled": True, "store": SYNC_STORE.snapshot()})
+            return
+        if path.startswith("/api/sync/info"):
+            account_id = (query.get("accountId") or [""])[0]
+            if not SyncStore.valid_account_id(account_id):
+                self._send_json(400, {"error": "accountId inválido."})
+                return
+            self._send_json(200, SYNC_STORE.info(account_id))
+            return
+        if path.startswith("/api/sync/load"):
+            account_id = (query.get("accountId") or [""])[0]
+            if not SyncStore.valid_account_id(account_id):
+                self._send_json(400, {"error": "accountId inválido."})
+                return
+            envelope = SYNC_STORE.load(account_id)
+            if envelope is None:
+                self._send_json(404, {"error": "Nenhum backup encontrado."})
+                return
+            self._send_json(200, {"envelope": envelope})
+            return
+        self._send_json(404, {"error": "Endpoint de sync desconhecido."})
+
+    def _handle_sync_post(self, path):
+        if not SYNC_ENABLED:
+            self._send_json(503, {"enabled": False, "error": "Backup na nuvem desativado."})
+            return
+        # Token opcional (o mesmo do app), quando configurado no servidor.
+        if API_TOKEN and self.headers.get("X-IFinance-Token", "") != API_TOKEN:
+            self._send_json(401, {"error": "Não autorizado."})
+            return
+        client_ip = self.client_address[0] if self.client_address else "?"
+        if not _rate_ok(client_ip):
+            self._send_json(429, {"error": "Muitas requisições. Tente mais tarde."})
+            return
+
+        payload = self._read_json()
+        if payload is None:
+            self._send_json(400, {"error": "JSON inválido."})
+            return
+        account_id = (payload.get("accountId") or "").strip()
+        envelope = payload.get("envelope")
+        if not SyncStore.valid_account_id(account_id):
+            self._send_json(400, {"error": "accountId inválido."})
+            return
+        if not isinstance(envelope, dict) or not envelope.get("blob"):
+            self._send_json(400, {"error": "Envelope inválido."})
+            return
+        if len(json.dumps(envelope)) > SYNC_MAX_BYTES:
+            self._send_json(413, {"error": "Backup excede o tamanho máximo."})
+            return
+
+        if path.startswith("/api/sync/save"):
+            SYNC_STORE.save(account_id, envelope)
+            self._send_json(200, {"ok": True, "store": SYNC_STORE.snapshot()})
+            return
+        self._send_json(404, {"error": "Endpoint de sync desconhecido."})
 
     # --- Passkeys (WebAuthn) ------------------------------------------------ #
     def _read_json(self):
