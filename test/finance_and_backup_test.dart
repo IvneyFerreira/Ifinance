@@ -411,9 +411,9 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // Restauração de backup completo (recriação de conta) — cap. 42/73
+  // Serialização e remapeamento de usuário — cap. 42
   // ---------------------------------------------------------------------------
-  group('Restauração de backup (recria usuário + dados)', () {
+  group('Usuário: copyWith e serialização', () {
     test('copyWith permite trocar o id (remap por e-mail)', () {
       final now = DateTime.now();
       final u = AppUser(
