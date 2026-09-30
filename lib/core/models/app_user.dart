@@ -113,6 +113,11 @@ class UserSettings {
   final int reminderDaysBefore;
   /// Desbloqueio por biometria (digital/rosto) — cap. 71.
   final bool biometricEnabled;
+  /// Login sem senha por Passkey (WebAuthn/FIDO2) — cap. 71.
+  final bool passkeyEnabled;
+  /// Identificador estável do dispositivo usado como nome de usuário
+  /// WebAuthn (armazenado no servidor Relying Party).
+  final String passkeyDeviceId;
 
   const UserSettings({
     required this.userId,
@@ -130,6 +135,8 @@ class UserSettings {
     this.remindersEnabled = false,
     this.reminderDaysBefore = 3,
     this.biometricEnabled = false,
+    this.passkeyEnabled = false,
+    this.passkeyDeviceId = '',
   });
 
   UserSettings copyWith({
@@ -147,6 +154,8 @@ class UserSettings {
     bool? remindersEnabled,
     int? reminderDaysBefore,
     bool? biometricEnabled,
+    bool? passkeyEnabled,
+    String? passkeyDeviceId,
   }) {
     return UserSettings(
       userId: userId,
@@ -167,6 +176,8 @@ class UserSettings {
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
       reminderDaysBefore: reminderDaysBefore ?? this.reminderDaysBefore,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
+      passkeyEnabled: passkeyEnabled ?? this.passkeyEnabled,
+      passkeyDeviceId: passkeyDeviceId ?? this.passkeyDeviceId,
     );
   }
 
@@ -187,6 +198,8 @@ class UserSettings {
         'remindersEnabled': remindersEnabled,
         'reminderDaysBefore': reminderDaysBefore,
         'biometricEnabled': biometricEnabled,
+        'passkeyEnabled': passkeyEnabled,
+        'passkeyDeviceId': passkeyDeviceId,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -211,5 +224,7 @@ class UserSettings {
         remindersEnabled: (m['remindersEnabled'] as bool?) ?? false,
         reminderDaysBefore: (m['reminderDaysBefore'] as num?)?.toInt() ?? 3,
         biometricEnabled: (m['biometricEnabled'] as bool?) ?? false,
+        passkeyEnabled: (m['passkeyEnabled'] as bool?) ?? false,
+        passkeyDeviceId: (m['passkeyDeviceId'] as String?) ?? '',
       );
 }

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/passkey_api.dart';
+import '../../core/services/passkey_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
@@ -138,6 +140,22 @@ class SettingsScreen extends StatelessWidget {
                       : 'Proteja o login com um código temporário'),
                   value: s.twoFactorEnabled,
                   onChanged: (v) => _toggleTwoFactor(context, c, v),
+                ),
+                const Divider(height: 20),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Login com passkey'),
+                  subtitle: Text(!c.passkeysConfigured
+                      ? 'Indisponível: servidor de passkeys não configurado'
+                      : !c.passkeysDeviceSupported
+                          ? 'Indisponível neste dispositivo'
+                          : s.passkeyEnabled
+                              ? 'Ativo — entre sem senha com digital/rosto'
+                              : 'Entre sem senha usando digital ou rosto'),
+                  value: s.passkeyEnabled,
+                  onChanged: (c.passkeysConfigured && c.passkeysDeviceSupported)
+                      ? (v) => _togglePasskey(context, c, v)
+                      : null,
                 ),
               ],
             ),
@@ -374,6 +392,40 @@ class SettingsScreen extends StatelessWidget {
           if (context.mounted) showToast(context, '2FA desativado.');
         }
       });
+    }
+  }
+
+  Future<void> _togglePasskey(
+      BuildContext context, AppController c, bool value) async {
+    if (value) {
+      try {
+        final ok = await c.enablePasskey();
+        if (!context.mounted) return;
+        showToast(context,
+            ok ? 'Passkey cadastrada! Você já pode entrar sem senha.'
+                : 'Cadastro de passkey cancelado.');
+      } on PasskeyFailure catch (e) {
+        if (context.mounted) showToast(context, e.message, error: true);
+      } on PasskeyApiException catch (e) {
+        if (context.mounted) showToast(context, e.message, error: true);
+      } catch (_) {
+        if (context.mounted) {
+          showToast(context, 'Não foi possível cadastrar a passkey.',
+              error: true);
+        }
+      }
+    } else {
+      final ok = await showConfirmDialog(
+        context,
+        title: 'Remover passkey',
+        message:
+            'Você deixará de entrar sem senha neste dispositivo. Poderá cadastrar novamente depois.',
+        confirmLabel: 'Remover',
+        destructive: true,
+      );
+      if (!context.mounted || !ok) return;
+      await c.disablePasskey();
+      if (context.mounted) showToast(context, 'Passkey removida.');
     }
   }
 

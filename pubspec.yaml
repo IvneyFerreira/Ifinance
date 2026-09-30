@@ -33,6 +33,7 @@ dependencies:
   timezone: ^0.10.1
   flutter_timezone: ^5.1.0
   local_auth: ^3.0.1
+  passkeys: ^2.23.1
 
 dev_dependencies:
   flutter_test:

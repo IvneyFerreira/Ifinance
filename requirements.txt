@@ -1,6 +1,11 @@
-# IFinance — dependências do backend (Assessor IA).
-# O servidor usa apenas a biblioteca padrão do Python (sem dependências
-# obrigatórias). Se você preferir um servidor de produção robusto, instale
-# o gunicorn + whitenoise e rode: gunicorn -w 2 -b 0.0.0.0:$PORT server:app
+# IFinance — dependências do backend.
 #
+# O Assessor IA (server.py) usa apenas a biblioteca padrão do Python.
+# As passkeys (WebAuthn) precisam de DUAS bibliotecas:
+
+cbor2>=5.6.0
+cryptography>=42.0.0
+
+# Servidor de produção robusto (opcional). Se usar gunicorn, ajuste o
+# Procfile para: gunicorn -w 2 -b 0.0.0.0:$PORT server:app
 # gunicorn>=21.2.0

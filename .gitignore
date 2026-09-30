@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .env
+
+# Passkeys (chaves públicas + desafios) — não versionar
+passkeys.json
+passkeys.json.tmp

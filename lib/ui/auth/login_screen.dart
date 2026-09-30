@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/services/auth_service.dart';
+import '../../core/services/passkey_service.dart';
+import '../../core/services/passkey_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
@@ -99,6 +101,35 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!ok) {
       setState(() => _error = 'Código inválido. Tente novamente.');
       _totp.clear();
+    }
+  }
+
+  /// Login sem senha por passkey (WebAuthn).
+  Future<void> _loginPasskey() async {
+    if (_email.text.trim().isEmpty) {
+      setState(() => _error = 'Informe o e-mail da conta para usar a passkey.');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
+    final controller = context.read<AppController>();
+    try {
+      final done = await controller.loginWithPasskey(_email.text);
+      if (!done && mounted) setState(() => _needTotp = true);
+    } on PasskeyFailure catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on PasskeyApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Não foi possível entrar com a passkey.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -247,6 +278,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : Text(_buttonLabel()),
                   ),
+                  if (_mode == _Mode.login && context.watch<AppController>().passkeysConfigured) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _loginPasskey,
+                      icon: const Icon(Icons.fingerprint),
+                      label: const Text('Entrar com passkey'),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   _footer(),
                 ],

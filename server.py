@@ -33,7 +33,14 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-APP_VERSION = "1.0.0"
+try:
+    import webauthn as wa
+    _WEBAUTHN_IMPORT_ERROR = None
+except Exception as _e:  # pragma: no cover - depende do ambiente
+    wa = None
+    _WEBAUTHN_IMPORT_ERROR = str(_e)
+
+APP_VERSION = "1.1.0"
 
 PORT = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 5060))
 WEB_DIR = os.environ.get(
@@ -51,6 +58,31 @@ LLM_ENABLED = bool(LLM_BASE and LLM_KEY)
 ALLOWED_ORIGINS = os.environ.get("IFINANCE_ALLOWED_ORIGINS", "*").strip()
 # Rate limit simples por IP (requisições/minuto). 0 desativa.
 RATE_LIMIT = int(os.environ.get("IFINANCE_RATE_LIMIT", "30") or "0")
+
+# --- Passkeys (WebAuthn) ----------------------------------------------------
+# Domínio do relying party (RP ID). Sem esquema. Ex.: app.ifinance.com.br
+PASSKEY_RP_ID = os.environ.get("IFINANCE_RP_ID", "").strip()
+PASSKEY_RP_NAME = os.environ.get("IFINANCE_RP_NAME", "IFinance").strip()
+# Origens autorizadas (além do próprio RP ID), separadas por vírgula.
+# Padrão: https://<RP_ID> e http://localhost:<PORT>
+_extra_origins = os.environ.get("IFINANCE_PASSKEY_ORIGINS", "").strip()
+PASSKEY_ORIGINS = [o.strip() for o in _extra_origins.split(",") if o.strip()]
+if PASSKEY_RP_ID:
+    PASSKEY_ORIGINS += [f"https://{PASSKEY_RP_ID}"]
+PASSKEY_ORIGINS += [f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"]
+PASSKEY_ORIGINS = list(dict.fromkeys(PASSKEY_ORIGINS))
+# Pacote Android e fingerprints para o assetlinks.json (Digital Asset Links).
+PASSKEY_ANDROID_PACKAGE = os.environ.get(
+    "IFINANCE_ANDROID_PACKAGE", "com.ifinance.app").strip()
+_PKG = os.environ.get("IFINANCE_ANDROID_SHA256", "").strip()
+PASSKEY_ANDROID_SHA256 = [f.strip() for f in _PKG.split(",") if f.strip()]
+
+PASSKEY_STORE_PATH = os.environ.get(
+    "IFINANCE_PASSKEY_STORE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "passkeys.json"),
+)
+PASSKEY_ENABLED = bool(wa and PASSKEY_RP_ID)
+PASSKEY_STORE = wa.PasskeyStore(PASSKEY_STORE_PATH) if PASSKEY_ENABLED else None
 
 _rate_lock = threading.Lock()
 _rate_buckets = {}  # ip -> [window_start_ts, count]
@@ -230,7 +262,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "model": LLM_MODEL if LLM_ENABLED else None,
                 "scope": "financas (despesas e entradas)",
                 "rate_limit_per_min": RATE_LIMIT,
+                "passkeys_enabled": PASSKEY_ENABLED,
             })
+            return
+        if self.path.startswith("/api/passkey/health"):
+            self._send_json(200, {
+                "passkeys_enabled": PASSKEY_ENABLED,
+                "rp_id": PASSKEY_RP_ID or None,
+                "origins": PASSKEY_ORIGINS,
+                "store": PASSKEY_STORE.snapshot() if PASSKEY_STORE else None,
+            })
+            return
+        if self.path.startswith("/.well-known/assetlinks.json"):
+            body = wa.assetlinks_json(
+                PASSKEY_ANDROID_PACKAGE, PASSKEY_ANDROID_SHA256
+            ) if wa else []
+            body_bytes = json.dumps(body, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body_bytes)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body_bytes)
             return
         # Flutter web (SPA): se o caminho não for um arquivo, serve index.html.
         return super().do_GET()
@@ -243,6 +296,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().send_head()
 
     def do_POST(self):
+        if self.path.startswith("/api/passkey/"):
+            self._handle_passkey(self.path)
+            return
         if not self.path.startswith("/api/assessor"):
             self._send_json(404, {"error": "not found"})
             return
@@ -296,6 +352,88 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(502, {"error": f"IA indisponível ({e.code}). {detail}"})
         except Exception as e:
             self._send_json(502, {"error": f"Falha ao consultar a IA: {str(e)[:200]}"})
+
+    # --- Passkeys (WebAuthn) ------------------------------------------------ #
+    def _read_json(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length) if length else b"{}"
+            return json.loads(raw or b"{}")
+        except Exception:
+            return None
+
+    def _origin_allowed(self):
+        origin = self.headers.get("Origin", "")
+        return (origin in PASSKEY_ORIGINS) if PASSKEY_ORIGINS else True
+
+    def _handle_passkey(self, path):
+        if not PASSKEY_ENABLED:
+            detail = "Passkeys desativadas."
+            if _WEBAUTHN_IMPORT_ERROR:
+                detail = f"Dependências ausentes: {_WEBAUTHN_IMPORT_ERROR}"
+            elif not PASSKEY_RP_ID:
+                detail = "IFINANCE_RP_ID não configurado no servidor."
+            self._send_json(503, {"error": detail})
+            return
+        if not self._origin_allowed():
+            self._send_json(403, {"error": "Origem não autorizada."})
+            return
+
+        payload = self._read_json()
+        if payload is None:
+            self._send_json(400, {"error": "JSON inválido"})
+            return
+
+        try:
+            if path.startswith("/api/passkey/register/start"):
+                username = (payload.get("username") or "").strip()
+                display = (payload.get("displayName") or username).strip()
+                if not username:
+                    raise ValueError("username obrigatório.")
+                cid, options = wa.create_registration_options(
+                    PASSKEY_STORE, username, display,
+                    PASSKEY_RP_ID, PASSKEY_RP_NAME,
+                )
+                self._send_json(200, {"challengeId": cid, "options": options})
+                return
+
+            if path.startswith("/api/passkey/register/finish"):
+                cid = payload.get("challengeId") or ""
+                credential = payload.get("credential") or {}
+                username, origin = wa.verify_registration(
+                    PASSKEY_STORE, cid, credential, PASSKEY_RP_ID
+                )
+                self._send_json(200, {
+                    "verified": True, "username": username, "origin": origin,
+                })
+                return
+
+            if path.startswith("/api/passkey/login/start"):
+                username = (payload.get("username") or "").strip()
+                if not username:
+                    raise ValueError("username obrigatório.")
+                cid, options = wa.create_authentication_options(
+                    PASSKEY_STORE, username, PASSKEY_RP_ID
+                )
+                self._send_json(200, {"challengeId": cid, "options": options})
+                return
+
+            if path.startswith("/api/passkey/login/finish"):
+                cid = payload.get("challengeId") or ""
+                credential = payload.get("credential") or {}
+                username, origin = wa.verify_authentication(
+                    PASSKEY_STORE, cid, credential, PASSKEY_RP_ID
+                )
+                self._send_json(200, {
+                    "verified": True, "username": username, "origin": origin,
+                })
+                return
+
+            self._send_json(404, {"error": "Endpoint de passkey desconhecido."})
+        except ValueError as e:
+            self._send_json(400, {"error": str(e)[:300]})
+        except Exception as e:  # pragma: no cover
+            self._send_json(500, {"error": f"Falha na operação de passkey: {str(e)[:200]}"})
 
 
 class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):

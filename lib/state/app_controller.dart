@@ -16,6 +16,8 @@ import '../core/services/statement_importer.dart';
 import '../core/services/totp_service.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/biometric_service.dart';
+import '../core/services/passkey_service.dart';
+import '../core/services/passkey_api.dart';
 import '../core/services/notifications/reminder_spec.dart';
 import '../core/utils/category_icons.dart';
 import '../core/utils/date_helpers.dart';
@@ -416,6 +418,88 @@ class AppController extends ChangeNotifier {
       notifyListeners();
     }
     return ok;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Passkeys / WebAuthn (cap. 71) — login sem senha
+  // ---------------------------------------------------------------------------
+
+  final PasskeyApi passkeys = PasskeyApi();
+
+  /// `true` se a plataforma do dispositivo consegue usar passkeys.
+  bool get passkeysDeviceSupported => passkeysSupported;
+
+  /// `true` se um servidor relying party foi configurado no build.
+  bool get passkeysConfigured => passkeys.isConfigured;
+
+  bool get passkeyEnabled => _settings.passkeyEnabled;
+
+  /// Consulta se o servidor tem passkeys habilitadas.
+  Future<bool> passkeyServerAvailable() async {
+    if (!passkeys.isConfigured) return false;
+    return passkeys.enabled();
+  }
+
+  static String _passkeyUsername(String email) => email.trim().toLowerCase();
+
+  /// Cadastra uma passkey para o usuário atual (exige biometria do sistema).
+  /// Retorna true se concluído; false se o usuário cancelou.
+  Future<bool> enablePasskey() async {
+    final user = _user;
+    if (user == null) return false;
+    final username = _passkeyUsername(user.email);
+    final start = await passkeys.registerStart(
+      username: username,
+      displayName: user.name,
+    );
+    final credentialJson = await passkeyRegister(start.optionsJson);
+    if (credentialJson == null) return false; // cancelado pelo usuário
+    final ok = await passkeys.registerFinish(
+      challengeId: start.challengeId,
+      credentialJson: credentialJson,
+    );
+    if (!ok) return false;
+    await updateSettings(_settings.copyWith(
+      passkeyEnabled: true,
+      passkeyDeviceId: username,
+    ));
+    await repo.log(user.id, 'passkey_on', 'User', entityId: user.id);
+    return true;
+  }
+
+  Future<void> disablePasskey() async {
+    await updateSettings(_settings.copyWith(passkeyEnabled: false));
+    await repo.log(_user!.id, 'passkey_off', 'User', entityId: _user!.id);
+  }
+
+  /// Login por passkey (sem senha). Retorna false se precisar de 2FA.
+  Future<bool> loginWithPasskey(String email) async {
+    final username = _passkeyUsername(email);
+    final start = await passkeys.loginStart(username: username);
+    final credentialJson = await passkeyAuthenticate(start.optionsJson);
+    if (credentialJson == null) return false;
+    final resolved = await passkeys.loginFinish(
+      challengeId: start.challengeId,
+      credentialJson: credentialJson,
+    );
+    if (_passkeyUsername(resolved) != username) {
+      throw AuthException('Passkey não corresponde à conta informada.');
+    }
+    final match = repo.users
+        .all()
+        .where((u) => !u.deleted && u.email.toLowerCase() == username);
+    if (match.isEmpty) {
+      throw AuthException('Conta não encontrada neste dispositivo.');
+    }
+    final user = match.first;
+    final s = repo.settings.findById(user.id);
+    if (s != null && s.twoFactorEnabled) {
+      _pendingTotpUser = user;
+      notifyListeners();
+      return false;
+    }
+    await _completeLogin(user);
+    return true;
   }
 
   static String _pinSalt() {
