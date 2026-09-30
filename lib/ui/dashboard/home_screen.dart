@@ -9,6 +9,7 @@ import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import '../shell/app_drawer.dart';
 import '../shell/quick_add.dart';
 import '../widgets/charts.dart';
 
@@ -33,65 +34,78 @@ class _HomeScreenState extends State<HomeScreen> {
     final dashboard = engine.buildDashboard(_horizon);
 
     return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.emerald,
-          onRefresh: () => c.refresh(),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-            children: [
-              _greeting(c),
-              const SizedBox(height: 20),
-              _safeAvailableBlock(context, engine, dashboard),
-              const SizedBox(height: 16),
-              _horizonSelector(),
-              const SizedBox(height: 16),
-              _monthSummaryCard(context, dashboard.monthSummary),
-              const SizedBox(height: 22),
-              _flowSection(context, engine),
-              const SizedBox(height: 22),
-              SectionHeader(title: 'Radar Financeiro'),
-              _radarCard(context, dashboard.radar),
-              const SizedBox(height: 22),
-              SectionHeader(
-                title: 'Próximos movimentos',
-                actionLabel: 'Timeline',
-                onAction: () => _openTimeline(context, engine),
-              ),
-              _upcomingEvents(context, engine),
-              const SizedBox(height: 22),
-              SectionHeader(title: 'Orçamentos'),
-              _budgets(context, c, engine),
-              const SizedBox(height: 22),
-              SectionHeader(title: 'Metas'),
-              _goals(context, c),
-            ],
+      drawer: appDrawerFor(context),
+      body: Builder(
+        builder: (context) => SafeArea(
+          child: RefreshIndicator(
+            color: AppColors.emerald,
+            onRefresh: () => c.refresh(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+              children: [
+                _greeting(context, c),
+                const SizedBox(height: 20),
+                _safeAvailableBlock(context, engine, dashboard),
+                const SizedBox(height: 16),
+                _horizonSelector(),
+                const SizedBox(height: 16),
+                _monthSummaryCard(context, dashboard.monthSummary),
+                const SizedBox(height: 22),
+                _flowSection(context, engine),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Radar Financeiro'),
+                _radarCard(context, dashboard.radar),
+                const SizedBox(height: 22),
+                SectionHeader(
+                  title: 'Próximos movimentos',
+                  actionLabel: 'Timeline',
+                  onAction: () => _openTimeline(context, engine),
+                ),
+                _upcomingEvents(context, engine),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Orçamentos'),
+                _budgets(context, c, engine),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Metas'),
+                _goals(context, c),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _greeting(AppController c) {
+  Widget _greeting(BuildContext context, AppController c) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Bom dia'
         : hour < 18
-            ? 'Boa tarde'
-            : 'Boa noite';
+        ? 'Boa tarde'
+        : 'Boa noite';
     final name = c.user?.name.split(' ').first ?? '';
     final t = Theme.of(context).textTheme;
     return Row(
       children: [
+        if (MediaQuery.of(context).size.width < 900)
+          IconButton(
+            tooltip: 'Menu',
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
+          ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$greeting, $name.',
-                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                '$greeting, $name.',
+                style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 2),
-              Text(DateHelpers.monthYear.format(DateTime.now()),
-                  style: t.bodySmall),
+              Text(
+                DateHelpers.monthYear.format(DateTime.now()),
+                style: t.bodySmall,
+              ),
             ],
           ),
         ),
@@ -109,7 +123,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _safeAvailableBlock(
-      BuildContext context, FinanceEngine engine, DashboardData d) {
+    BuildContext context,
+    FinanceEngine engine,
+    DashboardData d,
+  ) {
     final t = Theme.of(context).textTheme;
     final positive = d.safeAvailableCents >= 0;
     return FinancialCard(
@@ -127,20 +144,29 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Text('Seu dinheiro hoje',
-                  style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                'Seu dinheiro hoje',
+                style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
               const Spacer(),
               InkWell(
                 onTap: () => showCalcExplanation(
-                    context, engine.explainSafeAvailable(until: _horizonEnd(engine))),
+                  context,
+                  engine.explainSafeAvailable(until: _horizonEnd(engine)),
+                ),
                 borderRadius: BorderRadius.circular(AppRadius.pill),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline,
-                          size: 14, color: t.bodySmall?.color),
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: t.bodySmall?.color,
+                      ),
                       const SizedBox(width: 4),
                       Text('Ver cálculo', style: t.bodySmall),
                     ],
@@ -150,9 +176,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          MoneyDisplay(d.safeAvailableCents, fontSize: 40, fontWeight: FontWeight.w800),
-          Text('Livre seguro',
-              style: t.bodySmall?.copyWith(color: t.bodySmall?.color)),
+          MoneyDisplay(
+            d.safeAvailableCents,
+            fontSize: 40,
+            fontWeight: FontWeight.w800,
+          ),
+          Text(
+            'Livre seguro',
+            style: t.bodySmall?.copyWith(color: t.bodySmall?.color),
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -167,8 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     CalcExplanation(
                       title: 'Saldo em contas',
                       components: engine.accounts
-                          .map((a) =>
-                              CalcComponent(a.name, a.balanceCents))
+                          .map((a) => CalcComponent(a.name, a.balanceCents))
                           .toList(),
                       resultCents: d.currentBalanceCents,
                     ),
@@ -219,8 +250,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   DateTime _horizonEnd(FinanceEngine e) => e.horizonEndDate(_horizon);
 
-  Widget _miniMetric(BuildContext context, String label, int cents,
-      IconData icon, {Color? color, VoidCallback? onTap}) {
+  Widget _miniMetric(
+    BuildContext context,
+    String label,
+    int cents,
+    IconData icon, {
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final t = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
@@ -235,11 +272,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icon(icon, size: 14, color: color ?? t.bodySmall?.color),
                 const SizedBox(width: 6),
                 Flexible(
-                  child: Text(label,
-                      style: t.bodySmall?.copyWith(
-                        color: color ?? t.bodySmall?.color,
-                        fontSize: 11.5,
-                      )),
+                  child: Text(
+                    label,
+                    style: t.bodySmall?.copyWith(
+                      color: color ?? t.bodySmall?.color,
+                      fontSize: 11.5,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -272,8 +311,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: selected
                       ? (Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.darkCard
-                          : Colors.white)
+                            ? AppColors.darkCard
+                            : Colors.white)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   boxShadow: selected
@@ -281,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 6,
-                          )
+                          ),
                         ]
                       : null,
                 ),
@@ -312,16 +351,19 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Text(DateHelpers.monthLabel(s.month),
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                DateHelpers.monthLabel(s.month),
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const Spacer(),
               StatusBadge(
-                label: '${Money.formatPercent(s.committedPercent)} comprometido',
+                label:
+                    '${Money.formatPercent(s.committedPercent)} comprometido',
                 color: s.committedPercent > 90
                     ? AppColors.negative
                     : s.committedPercent > 75
-                        ? AppColors.warning
-                        : AppColors.positive,
+                    ? AppColors.warning
+                    : AppColors.positive,
               ),
             ],
           ),
@@ -329,20 +371,30 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Expanded(
-                  child: _monthMetric(
-                      context, 'Entrou', s.incomeCents, AppColors.positive)),
+                child: _monthMetric(
+                  context,
+                  'Entrou',
+                  s.incomeCents,
+                  AppColors.positive,
+                ),
+              ),
               Expanded(
-                  child: _monthMetric(
-                      context, 'Saiu', s.expenseCents, AppColors.negativeSoft)),
+                child: _monthMetric(
+                  context,
+                  'Saiu',
+                  s.expenseCents,
+                  AppColors.negativeSoft,
+                ),
+              ),
               Expanded(
-                  child: _monthMetric(
-                      context,
-                      'Resultado',
-                      s.resultCents,
-                      s.resultCents >= 0
-                          ? AppColors.positive
-                          : AppColors.negative,
-                      signed: true)),
+                child: _monthMetric(
+                  context,
+                  'Resultado',
+                  s.resultCents,
+                  s.resultCents >= 0 ? AppColors.positive : AppColors.negative,
+                  signed: true,
+                ),
+              ),
             ],
           ),
         ],
@@ -350,8 +402,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _monthMetric(BuildContext context, String label, int cents, Color color,
-      {bool signed = false}) {
+  Widget _monthMetric(
+    BuildContext context,
+    String label,
+    int cents,
+    Color color, {
+    bool signed = false,
+  }) {
     final t = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,10 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: 'Meu mês',
-          trailing: _flowSelector(),
-        ),
+        SectionHeader(title: 'Meu mês', trailing: _flowSelector()),
         FinancialCard(
           child: Column(
             children: [
@@ -407,8 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return GestureDetector(
             onTap: () => setState(() => _flowMonths = o),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                 color: selected ? AppColors.emerald : Colors.transparent,
                 borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -436,8 +489,10 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           width: 10,
           height: 10,
-          decoration:
-              BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
         ),
         const SizedBox(width: 6),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
@@ -468,14 +523,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Expanded(
-                child: _radarStat(context, 'Para pagar',
-                    Money.format(radar.paymentsCents), Icons.arrow_upward,
-                    AppColors.negativeSoft),
+                child: _radarStat(
+                  context,
+                  'Para pagar',
+                  Money.format(radar.paymentsCents),
+                  Icons.arrow_upward,
+                  AppColors.negativeSoft,
+                ),
               ),
               Expanded(
-                child: _radarStat(context, 'Para receber',
-                    Money.format(radar.receiptsCents), Icons.arrow_downward,
-                    AppColors.positive),
+                child: _radarStat(
+                  context,
+                  'Para receber',
+                  Money.format(radar.receiptsCents),
+                  Icons.arrow_downward,
+                  AppColors.positive,
+                ),
               ),
             ],
           ),
@@ -489,8 +552,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.event_available,
-                      size: 16, color: AppColors.positive),
+                  const Icon(
+                    Icons.event_available,
+                    size: 16,
+                    color: AppColors.positive,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Próxima entrada: ${Money.format(radar.nextIncomeCents)} • ${DateHelpers.dayMonth.format(radar.nextIncomeDate!)}',
@@ -502,18 +568,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (radar.insights.isNotEmpty) ...[
             const SizedBox(height: 14),
-            ...radar.insights.map((i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _insightRow(context, i),
-                )),
+            ...radar.insights.map(
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _insightRow(context, i),
+              ),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _radarStat(BuildContext context, String label, String value,
-      IconData icon, Color color) {
+  Widget _radarStat(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     final t = Theme.of(context).textTheme;
     return Row(
       children: [
@@ -523,8 +596,10 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: t.bodySmall?.copyWith(fontSize: 11)),
-            Text(value,
-                style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              value,
+              style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ],
         ),
       ],
@@ -550,11 +625,12 @@ class _HomeScreenState extends State<HomeScreen> {
         Icon(icon, size: 16, color: color),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(i.message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(height: 1.35)),
+          child: Text(
+            i.message,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.35),
+          ),
         ),
       ],
     );
@@ -570,8 +646,10 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.waves, color: AppColors.emerald),
             const SizedBox(width: 12),
             Expanded(
-              child: Text('Nenhum movimento previsto. Tudo tranquilo.',
-                  style: Theme.of(context).textTheme.bodyMedium),
+              child: Text(
+                'Nenhum movimento previsto. Tudo tranquilo.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ],
         ),
@@ -590,17 +668,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(DateHelpers.friendly(timeline[i].event.date),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(
+                        DateHelpers.friendly(timeline[i].event.date),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: 2),
                       SizedBox(
                         width: 140,
-                        child: Text(timeline[i].event.label,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium),
+                        child: Text(
+                          timeline[i].event.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ),
                     ],
                   ),
@@ -615,11 +696,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         signed: true,
                       ),
                       const SizedBox(height: 2),
-                      Text('Saldo ${Money.format(timeline[i].balanceAfter)}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(fontSize: 11)),
+                      Text(
+                        'Saldo ${Money.format(timeline[i].balanceAfter)}',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(fontSize: 11),
+                      ),
                     ],
                   ),
                 ],
@@ -636,8 +718,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final usage = engine.getBudgetUsage(c.budgets).take(5).toList();
     if (usage.isEmpty) {
       return FinancialCard(
-        child: Text('Nenhum orçamento definido ainda.',
-            style: Theme.of(context).textTheme.bodyMedium),
+        child: Text(
+          'Nenhum orçamento definido ainda.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       );
     }
     return FinancialCard(
@@ -651,24 +735,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(u.categoryName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        u.categoryName,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    Text('${u.percent.toStringAsFixed(0)}%',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      '${u.percent.toStringAsFixed(0)}%',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '${Money.format(u.consumedCents)} / ${Money.format(u.limitCents)}',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(fontSize: 11),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(fontSize: 11),
                     ),
                   ],
                 ),
@@ -686,54 +771,61 @@ class _HomeScreenState extends State<HomeScreen> {
     final goals = c.goals.where((g) => !g.archived).take(3).toList();
     if (goals.isEmpty) {
       return FinancialCard(
-        child: Text('Nenhuma meta criada ainda.',
-            style: Theme.of(context).textTheme.bodyMedium),
+        child: Text(
+          'Nenhuma meta criada ainda.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       );
     }
     return Column(
       children: goals
-          .map((g) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: FinancialCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          CircleIcon(
-                              icon: Icons.flag_outlined,
-                              color: Color(g.colorValue),
-                              size: 34),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(g.name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700)),
+          .map(
+            (g) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: FinancialCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleIcon(
+                          icon: Icons.flag_outlined,
+                          color: Color(g.colorValue),
+                          size: 34,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            g.name,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
-                          Text('${(g.progress * 100).toStringAsFixed(0)}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(g.colorValue),
-                                  )),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      BudgetProgress(
-                          percent: g.progress * 100, color: Color(g.colorValue)),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${Money.format(g.accumulatedCents)} de ${Money.format(g.targetCents)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
+                        ),
+                        Text(
+                          '${(g.progress * 100).toStringAsFixed(0)}%',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Color(g.colorValue),
+                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    BudgetProgress(
+                      percent: g.progress * 100,
+                      color: Color(g.colorValue),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${Money.format(g.accumulatedCents)} de ${Money.format(g.targetCents)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ),
-              ))
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -753,8 +845,9 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (_, scrollController) => Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.xl),
+              ),
             ),
             child: Column(
               children: [
@@ -768,8 +861,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Timeline financeira',
-                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  'Timeline financeira',
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: timeline.isEmpty
@@ -785,8 +880,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           itemCount: timeline.length,
                           itemBuilder: (_, i) {
                             final item = timeline[i];
-                            return _timelineRow(ctx, item.event,
-                                item.balanceAfter);
+                            return _timelineRow(
+                              ctx,
+                              item.event,
+                              item.balanceAfter,
+                            );
                           },
                         ),
                 ),
@@ -818,24 +916,29 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(DateHelpers.friendly(e.date),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w600)),
-                Text(e.label,
-                    style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  DateHelpers.friendly(e.date),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(e.label, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 2),
-                Text('Saldo após evento: ${Money.format(balanceAfter)}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontSize: 11)),
+                Text(
+                  'Saldo após evento: ${Money.format(balanceAfter)}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontSize: 11),
+                ),
               ],
             ),
           ),
-          MoneyDisplay(e.amountCents,
-              fontSize: 15, colorize: true, signed: true),
+          MoneyDisplay(
+            e.amountCents,
+            fontSize: 15,
+            colorize: true,
+            signed: true,
+          ),
         ],
       ),
     );
@@ -857,8 +960,9 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (_, sc) => Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.xl),
+              ),
             ),
             child: Column(
               children: [
@@ -872,8 +976,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Notificações',
-                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  'Notificações',
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: list.isEmpty
@@ -898,7 +1004,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     AppColors.positive,
                                   InsightSeverity.info => AppColors.info,
                                   InsightSeverity.warning => AppColors.warning,
-                                  InsightSeverity.critical => AppColors.negative,
+                                  InsightSeverity.critical =>
+                                    AppColors.negative,
                                 },
                                 title: n.title,
                                 message: n.message,

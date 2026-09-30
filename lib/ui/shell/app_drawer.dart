@@ -53,39 +53,99 @@ class AppDrawer extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _sectionLabel('Navegação'),
-            _tile(context, Icons.home_outlined, 'Início',
-                onTap: () => _goTab(context, 0)),
-            _tile(context, Icons.swap_vert, 'Movimentações',
-                onTap: () => _goTab(context, 1)),
-            _tile(context, Icons.calendar_month_outlined, 'Planejar',
-                onTap: () => _goTab(context, 2)),
-            _tile(context, Icons.flag_outlined, 'Metas',
-                onTap: () => _goTab(context, 3)),
-            _tile(context, Icons.person_outline, 'Perfil',
-                onTap: () => _goTab(context, 4)),
+            _tile(
+              context,
+              Icons.home_outlined,
+              'Início',
+              onTap: () => _goTab(context, 0),
+            ),
+            _tile(
+              context,
+              Icons.swap_vert,
+              'Movimentações',
+              onTap: () => _goTab(context, 1),
+            ),
+            _tile(
+              context,
+              Icons.calendar_month_outlined,
+              'Planejar',
+              onTap: () => _goTab(context, 2),
+            ),
+            _tile(
+              context,
+              Icons.flag_outlined,
+              'Metas',
+              onTap: () => _goTab(context, 3),
+            ),
+            _tile(
+              context,
+              Icons.person_outline,
+              'Perfil',
+              onTap: () => _goTab(context, 4),
+            ),
             const SizedBox(height: 6),
             _sectionLabel('Ferramentas'),
-            _tile(context, Icons.account_balance_wallet_outlined, 'Contas',
-                onTap: () => _push(context, const AccountsScreen())),
-            _tile(context, Icons.credit_card, 'Cartões',
-                onTap: () => _push(context, const CardsScreen())),
-            _tile(context, Icons.pie_chart_outline, 'Orçamentos',
-                onTap: () => _push(context, const BudgetsScreen())),
-            _tile(context, Icons.autorenew, 'Recorrências',
-                onTap: () => _push(context, const RecurringScreen())),
-            _tile(context, Icons.subscriptions_outlined, 'Assinaturas',
-                onTap: () => _push(context, const SubscriptionsScreen())),
-            _tile(context, Icons.savings_outlined, 'Patrimônio',
-                onTap: () => _push(context, const WealthScreen())),
-            _tile(context, Icons.bar_chart, 'Relatórios',
-                onTap: () => _push(context, const ReportsScreen())),
-            _tile(context, Icons.backup_outlined, 'Importar / Exportar',
-                onTap: () => _push(context, const DataScreen())),
+            _tile(
+              context,
+              Icons.account_balance_wallet_outlined,
+              'Contas',
+              onTap: () => _push(context, const AccountsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.credit_card,
+              'Cartões',
+              onTap: () => _push(context, const CardsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.pie_chart_outline,
+              'Orçamentos',
+              onTap: () => _push(context, const BudgetsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.autorenew,
+              'Recorrências',
+              onTap: () => _push(context, const RecurringScreen()),
+            ),
+            _tile(
+              context,
+              Icons.subscriptions_outlined,
+              'Assinaturas',
+              onTap: () => _push(context, const SubscriptionsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.savings_outlined,
+              'Patrimônio',
+              onTap: () => _push(context, const WealthScreen()),
+            ),
+            _tile(
+              context,
+              Icons.bar_chart,
+              'Relatórios',
+              onTap: () => _push(context, const ReportsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.backup_outlined,
+              'Importar / Exportar',
+              onTap: () => _push(context, const DataScreen()),
+            ),
             const Divider(height: 24, indent: 20, endIndent: 20),
-            _tile(context, Icons.settings_outlined, 'Configurações',
-                onTap: () => _push(context, const SettingsScreen())),
-            _tile(context, Icons.info_outline, 'Sobre e Ajuda',
-                onTap: () => _push(context, const AboutScreen())),
+            _tile(
+              context,
+              Icons.settings_outlined,
+              'Configurações',
+              onTap: () => _push(context, const SettingsScreen()),
+            ),
+            _tile(
+              context,
+              Icons.info_outline,
+              'Sobre e Ajuda',
+              onTap: () => _push(context, const AboutScreen()),
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -107,7 +167,9 @@ class AppDrawer extends StatelessWidget {
 
   Widget _header(BuildContext context, String name, String email) {
     final t = Theme.of(context).textTheme;
-    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'iF';
+    final initial = name.trim().isNotEmpty
+        ? name.trim()[0].toUpperCase()
+        : 'iF';
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
       decoration: const BoxDecoration(
@@ -133,9 +195,10 @@ class AppDrawer extends StatelessWidget {
                   child: Text(
                     initial,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800),
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
@@ -144,14 +207,19 @@ class AppDrawer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('IFinance',
-                        style: t.titleMedium?.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.w800)),
+                    Text(
+                      'IFinance',
+                      style: t.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       'Sua vida financeira sob controle',
                       style: t.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.9)),
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
                     ),
                   ],
                 ),
@@ -159,17 +227,24 @@ class AppDrawer extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text(name,
-              style: t.bodyMedium?.copyWith(
-                  color: Colors.white, fontWeight: FontWeight.w700),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            name,
+            style: t.bodyMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           if (email.isNotEmpty)
-            Text(email,
-                style: t.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.85)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            Text(
+              email,
+              style: t.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
         ],
       ),
     );
@@ -220,17 +295,22 @@ class AppDrawer extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: t.bodyMedium?.copyWith(
-                            fontWeight:
-                                highlight ? FontWeight.w700 : FontWeight.w600,
-                            color: highlight ? AppColors.emerald : null,
-                          )),
+                      Text(
+                        title,
+                        style: t.bodyMedium?.copyWith(
+                          fontWeight: highlight
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                          color: highlight ? AppColors.emerald : null,
+                        ),
+                      ),
                       if (subtitle != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
-                          child: Text(subtitle,
-                              style: t.bodySmall?.copyWith(fontSize: 11)),
+                          child: Text(
+                            subtitle,
+                            style: t.bodySmall?.copyWith(fontSize: 11),
+                          ),
                         ),
                     ],
                   ),

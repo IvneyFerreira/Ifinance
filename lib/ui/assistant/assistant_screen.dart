@@ -23,7 +23,12 @@ class _Msg {
   final bool fromUser;
   final bool isError;
   final bool loading;
-  _Msg(this.text, {this.fromUser = false, this.isError = false, this.loading = false});
+  _Msg(
+    this.text, {
+    this.fromUser = false,
+    this.isError = false,
+    this.loading = false,
+  });
 }
 
 class _AssistantScreenState extends State<AssistantScreen> {
@@ -91,11 +96,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     String answer;
     bool error = false;
     try {
-      answer = await _api.ask(
-        question: q,
-        context: context_,
-        history: history,
-      );
+      answer = await _api.ask(question: q, context: context_, history: history);
     } on AssessorException catch (e) {
       answer = 'Não consegui falar com a IA agora. ${e.message}';
       error = true;
@@ -118,8 +119,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -138,8 +142,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
               _aiEnabled == true
                   ? 'IA financeira ativa • foco em despesas e entradas'
                   : _aiEnabled == false
-                      ? 'IA indisponível no momento'
-                      : 'Conectando à IA...',
+                  ? 'IA indisponível no momento'
+                  : 'Conectando à IA...',
               style: TextStyle(
                 fontSize: 11.5,
                 color: _aiEnabled == true
@@ -180,8 +184,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.all(14),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
+        ),
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.circular(18),
@@ -190,7 +195,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
               : Border.all(
                   color: m.isError
                       ? AppColors.negativeSoft
-                      : (isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+                      : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                ),
         ),
         child: m.loading
             ? Row(
@@ -200,11 +206,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.emerald),
+                      strokeWidth: 2,
+                      color: AppColors.emerald,
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Text(m.text,
-                      style: t.bodySmall?.copyWith(color: AppColors.gray400)),
+                  Text(
+                    m.text,
+                    style: t.bodySmall?.copyWith(color: AppColors.gray400),
+                  ),
                 ],
               )
             : Row(
@@ -214,15 +224,22 @@ class _AssistantScreenState extends State<AssistantScreen> {
                     const CircleAvatar(
                       radius: 13,
                       backgroundColor: AppColors.emerald,
-                      child: Icon(Icons.auto_awesome,
-                          size: 14, color: Colors.white),
+                      child: Icon(
+                        Icons.auto_awesome,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 10),
                   ],
                   Flexible(
-                    child: Text(m.text,
-                        style:
-                            t.bodyMedium?.copyWith(color: textColor, height: 1.42)),
+                    child: Text(
+                      m.text,
+                      style: t.bodyMedium?.copyWith(
+                        color: textColor,
+                        height: 1.42,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -285,7 +302,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.send, color: Colors.white),
               ),

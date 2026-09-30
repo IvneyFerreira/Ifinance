@@ -104,7 +104,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
                       final dayTotal = items.fold<int>(
                         0,
-                        (sum, t) => sum + (t.isTransfer ? 0 : t.economicSignedCents),
+                        (sum, t) =>
+                            sum + (t.isTransfer ? 0 : t.economicSignedCents),
                       );
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,29 +114,35 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             padding: const EdgeInsets.only(top: 18, bottom: 8),
                             child: Row(
                               children: [
-                                Text(_dayHeader(day),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.w700)),
+                                Text(
+                                  _dayHeader(day),
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
                                 const Spacer(),
                                 if (!items.every((t) => t.isTransfer))
-                                  MoneyDisplay(dayTotal,
-                                      fontSize: 12,
-                                      colorize: true,
-                                      signed: true),
+                                  MoneyDisplay(
+                                    dayTotal,
+                                    fontSize: 12,
+                                    colorize: true,
+                                    signed: true,
+                                  ),
                               ],
                             ),
                           ),
                           FinancialCard(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 4),
+                              horizontal: 14,
+                              vertical: 4,
+                            ),
                             child: Column(
                               children: [
                                 for (var j = 0; j < items.length; j++) ...[
                                   TransactionTile(
                                     transaction: items[j],
-                                    category: c.categoryById(items[j].categoryId),
+                                    category: c.categoryById(
+                                      items[j].categoryId,
+                                    ),
                                     account: c.accountById(items[j].accountId),
                                     card: c.cardById(items[j].creditCardId),
                                     onTap: () => _showDetail(items[j]),
@@ -163,8 +170,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     return all.where((t) {
       if (t.deleted) return false;
       final q = _search.text.trim().toLowerCase();
-      if (q.isNotEmpty &&
-          !t.description.toLowerCase().contains(q)) {
+      if (q.isNotEmpty && !t.description.toLowerCase().contains(q)) {
         return false;
       }
       switch (_filter) {
@@ -192,8 +198,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         }
       }
       return true;
-    }).toList()
-      ..sort((a, b) => b.competenceDate.compareTo(a.competenceDate));
+    }).toList()..sort((a, b) => b.competenceDate.compareTo(a.competenceDate));
   }
 
   String _dayHeader(DateTime d) {
@@ -241,8 +246,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           builder: (ctx, setSheet) => Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppRadius.xl),
+              ),
             ),
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             child: SafeArea(
@@ -251,14 +257,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Filtros',
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    'Filtros',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  Text('Categoria',
-                      style: Theme.of(ctx).textTheme.bodySmall),
+                  Text('Categoria', style: Theme.of(ctx).textTheme.bodySmall),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
@@ -285,8 +291,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Período',
-                      style: Theme.of(ctx).textTheme.bodySmall),
+                  Text('Período', style: Theme.of(ctx).textTheme.bodySmall),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -305,9 +310,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             }
                           },
                           icon: const Icon(Icons.date_range),
-                          label: Text(_range == null
-                              ? 'Selecionar'
-                              : '${DateHelpers.dayMonth.format(_range!.start)} - ${DateHelpers.dayMonth.format(_range!.end)}'),
+                          label: Text(
+                            _range == null
+                                ? 'Selecionar'
+                                : '${DateHelpers.dayMonth.format(_range!.start)} - ${DateHelpers.dayMonth.format(_range!.end)}',
+                          ),
                         ),
                       ),
                     ],
@@ -360,8 +367,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         return Container(
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl),
+            ),
           ),
           padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
           child: SafeArea(
@@ -381,23 +389,29 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Text(t.description,
-                    style: Theme.of(ctx)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  t.description,
+                  style: Theme.of(
+                    ctx,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 4),
-                MoneyDisplay(t.economicSignedCents,
-                    fontSize: 30,
-                    colorize: true,
-                    signed: !t.isExpense),
+                MoneyDisplay(
+                  t.economicSignedCents,
+                  fontSize: 30,
+                  colorize: true,
+                  signed: !t.isExpense,
+                ),
                 const SizedBox(height: 16),
                 _detailRow(ctx, 'Tipo', _typeLabel(t)),
-                if (cat != null)
-                  _detailRow(ctx, 'Categoria', cat.name),
+                if (cat != null) _detailRow(ctx, 'Categoria', cat.name),
                 if (acc != null) _detailRow(ctx, 'Conta', acc.name),
                 if (card != null) _detailRow(ctx, 'Cartão', card.name),
-                _detailRow(ctx, 'Data', DateHelpers.fullDate.format(t.competenceDate)),
+                _detailRow(
+                  ctx,
+                  'Data',
+                  DateHelpers.fullDate.format(t.competenceDate),
+                ),
                 _detailRow(ctx, 'Status', _statusLabel(t)),
                 if (t.notes.isNotEmpty) _detailRow(ctx, 'Observação', t.notes),
                 if (!t.isTransfer) ...[
@@ -413,9 +427,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                           Navigator.pop(ctx);
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => _editFormFor(t),
-                            ),
+                            MaterialPageRoute(builder: (_) => _editFormFor(t)),
                           );
                         },
                         icon: const Icon(Icons.edit_outlined),
@@ -431,9 +443,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                 await c.markTransactionPaid(t, paid: !t.isPaid);
                                 if (ctx.mounted) Navigator.pop(ctx);
                               },
-                        child: Text(t.isTransfer
-                            ? 'Transferência'
-                            : (t.isPaid ? 'Marcar pendente' : 'Confirmar')),
+                        child: Text(
+                          t.isTransfer
+                              ? 'Transferência'
+                              : (t.isPaid ? 'Marcar pendente' : 'Confirmar'),
+                        ),
                       ),
                     ),
                   ],
@@ -461,10 +475,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         if (ctx.mounted) Navigator.pop(ctx);
                       }
                     },
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.negative),
-                    label: const Text('Excluir',
-                        style: TextStyle(color: AppColors.negative)),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.negative,
+                    ),
+                    label: const Text(
+                      'Excluir',
+                      style: TextStyle(color: AppColors.negative),
+                    ),
                   ),
                 ),
               ],
@@ -483,9 +501,11 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           Text(label, style: Theme.of(ctx).textTheme.bodySmall),
           const Spacer(),
           Flexible(
-            child: Text(value,
-                textAlign: TextAlign.right,
-                style: Theme.of(ctx).textTheme.bodyMedium),
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
           ),
         ],
       ),
@@ -504,7 +524,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   String _typeLabel(Transaction t) {
     if (t.isTransfer) return 'Transferência';
-    if (t.creditCardId != null && !t.isInvoicePayment) return 'Compra no cartão';
+    if (t.creditCardId != null && !t.isInvoicePayment) {
+      return 'Compra no cartão';
+    }
     if (t.isInvoicePayment) return 'Pagamento de fatura';
     if (t.isIncome) return 'Receita';
     if (t.isAdjustment) return 'Ajuste';

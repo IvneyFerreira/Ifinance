@@ -27,14 +27,18 @@ class GoalsScreen extends StatelessWidget {
         title: const Text('Metas'),
         actions: [
           IconButton(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const BudgetsScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BudgetsScreen()),
+            ),
             icon: const Icon(Icons.pie_chart_outline),
             tooltip: 'Orçamentos',
           ),
           IconButton(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const GoalFormScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const GoalFormScreen()),
+            ),
             icon: const Icon(Icons.add),
           ),
         ],
@@ -46,8 +50,10 @@ class GoalsScreen extends StatelessWidget {
               message:
                   'Crie objetivos como viagem, reserva ou compra planejada e acompanhe o progresso.',
               actionLabel: 'Criar meta',
-              onAction: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const GoalFormScreen())),
+              onAction: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GoalFormScreen()),
+              ),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
@@ -61,8 +67,10 @@ class GoalsScreen extends StatelessWidget {
                     ),
                   ),
                 OutlinedButton.icon(
-                  onPressed: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const GoalFormScreen())),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GoalFormScreen()),
+                  ),
                   icon: const Icon(Icons.add),
                   label: const Text('Nova meta'),
                 ),
@@ -92,12 +100,18 @@ class _GoalCard extends StatelessWidget {
               CircleIcon(icon: Icons.flag, color: color, size: 40),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(goal.name,
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  goal.name,
+                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
               ),
-              Text('${(goal.progress * 100).toStringAsFixed(0)}%',
-                  style: t.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w800, color: color)),
+              Text(
+                '${(goal.progress * 100).toStringAsFixed(0)}%',
+                style: t.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -106,14 +120,26 @@ class _GoalCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                  child: _metric(context, 'Acumulado',
-                      Money.format(goal.accumulatedCents))),
+                child: _metric(
+                  context,
+                  'Acumulado',
+                  Money.format(goal.accumulatedCents),
+                ),
+              ),
               Expanded(
-                  child: _metric(context, 'Objetivo',
-                      Money.format(goal.targetCents))),
+                child: _metric(
+                  context,
+                  'Objetivo',
+                  Money.format(goal.targetCents),
+                ),
+              ),
               Expanded(
-                  child: _metric(context, 'Faltam',
-                      Money.format(goal.remainingCents))),
+                child: _metric(
+                  context,
+                  'Faltam',
+                  Money.format(goal.remainingCents),
+                ),
+              ),
             ],
           ),
           if (goal.deadline != null) ...[
@@ -172,12 +198,14 @@ class _GoalCard extends StatelessWidget {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return Padding(
           padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : AppColors.lightCard,
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppRadius.xl)),
+                top: Radius.circular(AppRadius.xl),
+              ),
             ),
             padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
             child: SafeArea(
@@ -186,11 +214,12 @@ class _GoalCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Contribuir para ${goal.name}',
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    'Contribuir para ${goal.name}',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: amount,

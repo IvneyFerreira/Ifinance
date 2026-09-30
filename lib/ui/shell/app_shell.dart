@@ -181,15 +181,21 @@ class _NavItem extends StatelessWidget {
         children: [
           Icon(selected ? icon.$2 : icon.$1, color: color, size: 24),
           const SizedBox(height: 2),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9.5,
-                color: color,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              )),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: color,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -234,30 +240,39 @@ class _Sidebar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(11),
                     ),
                     child: const Center(
-                      child: Text('iF',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 20)),
+                      child: Text(
+                        'iF',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('IFinance',
-                      style:
-                          t.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text(
+                    'IFinance',
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  ),
                 ],
               ),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Financial Command Center',
-                  style: TextStyle(fontSize: 11)),
+              child: Text(
+                'Financial Command Center',
+                style: TextStyle(fontSize: 11),
+              ),
             ),
             const SizedBox(height: 18),
             ...List.generate(items.length, (i) {
               final selected = index == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
                 child: Material(
                   color: selected
                       ? AppColors.emerald.withValues(alpha: 0.14)
@@ -268,21 +283,28 @@ class _Sidebar extends StatelessWidget {
                     onTap: () => onSelect(i),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
-                          Icon(items[i].$1,
-                              size: 20,
-                              color: selected
-                                  ? AppColors.emerald
-                                  : t.bodyMedium?.color),
+                          Icon(
+                            items[i].$1,
+                            size: 20,
+                            color: selected
+                                ? AppColors.emerald
+                                : t.bodyMedium?.color,
+                          ),
                           const SizedBox(width: 12),
-                          Text(items[i].$2,
-                              style: t.bodyMedium?.copyWith(
-                                fontWeight:
-                                    selected ? FontWeight.w700 : FontWeight.w500,
-                                color: selected ? AppColors.emerald : null,
-                              )),
+                          Text(
+                            items[i].$2,
+                            style: t.bodyMedium?.copyWith(
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: selected ? AppColors.emerald : null,
+                            ),
+                          ),
                         ],
                       ),
                     ),

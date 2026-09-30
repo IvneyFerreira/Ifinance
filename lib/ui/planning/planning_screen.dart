@@ -28,7 +28,9 @@ class _PlanningScreenState extends State<PlanningScreen> {
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
     final engine = c.engine;
-    final until = DateHelpers.endOfMonth(DateHelpers.addMonths(DateTime.now(), _months));
+    final until = DateHelpers.endOfMonth(
+      DateHelpers.addMonths(DateTime.now(), _months),
+    );
     final projected = engine.getProjectedBalance(until);
     final lowest = engine.getLowestProjectedBalance(until: until);
     final series = engine.buildProjectionSeries(until: until);
@@ -39,37 +41,55 @@ class _PlanningScreenState extends State<PlanningScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         children: [
-          Text('Futuro Financeiro',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            'Futuro Financeiro',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 6),
-          Text('Como estarão suas finanças daqui a alguns meses.',
-              style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            'Como estarão suas finanças daqui a alguns meses.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           const SizedBox(height: 18),
           _horizonSelector(),
           const SizedBox(height: 18),
           FinancialCard(
-            gradient: LinearGradient(colors: [
-              AppColors.emerald.withValues(alpha: 0.14),
-              AppColors.emerald.withValues(alpha: 0.03),
-            ]),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.emerald.withValues(alpha: 0.14),
+                AppColors.emerald.withValues(alpha: 0.03),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Saldo projetado',
-                    style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  'Saldo projetado',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 4),
-                MoneyDisplay(projected, fontSize: 34, fontWeight: FontWeight.w800),
-                Text('até ${DateHelpers.fullDate.format(until)}',
-                    style: Theme.of(context).textTheme.bodySmall),
+                MoneyDisplay(
+                  projected,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w800,
+                ),
+                Text(
+                  'até ${DateHelpers.fullDate.format(until)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
-                      child: _mini(context, 'Menor saldo',
-                          lowest.balance, lowest.date, AppColors.warning),
+                      child: _mini(
+                        context,
+                        'Menor saldo',
+                        lowest.balance,
+                        lowest.date,
+                        AppColors.warning,
+                      ),
                     ),
                   ],
                 ),
@@ -98,13 +118,21 @@ class _PlanningScreenState extends State<PlanningScreen> {
           Row(
             children: [
               Expanded(
-                child: _exploreCard(context, Icons.calendar_month_outlined,
-                    'Calendário', CalendarScreen()),
+                child: _exploreCard(
+                  context,
+                  Icons.calendar_month_outlined,
+                  'Calendário',
+                  CalendarScreen(),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _exploreCard(context, Icons.credit_card_outlined,
-                    'Cartões', const CardsScreen()),
+                child: _exploreCard(
+                  context,
+                  Icons.credit_card_outlined,
+                  'Cartões',
+                  const CardsScreen(),
+                ),
               ),
             ],
           ),
@@ -136,8 +164,13 @@ class _PlanningScreenState extends State<PlanningScreen> {
     );
   }
 
-  Widget _mini(BuildContext context, String label, int cents, DateTime? date,
-      Color color) {
+  Widget _mini(
+    BuildContext context,
+    String label,
+    int cents,
+    DateTime? date,
+    Color color,
+  ) {
     final t = Theme.of(context).textTheme;
     return Row(
       children: [
@@ -167,8 +200,10 @@ class _PlanningScreenState extends State<PlanningScreen> {
         Container(
           width: 10,
           height: 10,
-          decoration:
-              BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
         ),
         const SizedBox(width: 6),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
@@ -176,22 +211,32 @@ class _PlanningScreenState extends State<PlanningScreen> {
     );
   }
 
-  Widget _exploreCard(BuildContext context, IconData icon, String label,
-      Widget screen, {bool wide = false}) {
+  Widget _exploreCard(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Widget screen, {
+    bool wide = false,
+  }) {
     return FinancialCard(
       onTap: () =>
           Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
       child: Row(
         children: [
-          const CircleIcon(icon: Icons.arrow_forward, color: AppColors.emerald, size: 0),
+          const CircleIcon(
+            icon: Icons.arrow_forward,
+            color: AppColors.emerald,
+            size: 0,
+          ),
           Icon(icon, color: AppColors.emerald, size: 22),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(label,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
           const Icon(Icons.chevron_right, color: AppColors.gray400),
         ],

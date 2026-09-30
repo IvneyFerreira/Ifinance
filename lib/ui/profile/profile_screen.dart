@@ -24,7 +24,10 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
     final engine = c.engine;
-    final net = engine.getNetWorth(others: c.assets, liabilities: c.liabilities);
+    final net = engine.getNetWorth(
+      others: c.assets,
+      liabilities: c.liabilities,
+    );
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -41,7 +44,8 @@ class ProfileScreen extends StatelessWidget {
                   height: 54,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                        colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                      colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
@@ -50,9 +54,10 @@ class ProfileScreen extends StatelessWidget {
                           ? c.user!.name.substring(0, 1).toUpperCase()
                           : 'iF',
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800),
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -61,12 +66,17 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(c.user?.name ?? 'Usuário',
-                          style: t.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      Text(c.user?.email ?? '',
-                          style: t.bodySmall,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        c.user?.name ?? 'Usuário',
+                        style: t.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        c.user?.email ?? '',
+                        style: t.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -96,10 +106,12 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FinancialCard(
-            gradient: LinearGradient(colors: [
-              AppColors.emerald.withValues(alpha: 0.14),
-              AppColors.emerald.withValues(alpha: 0.03),
-            ]),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.emerald.withValues(alpha: 0.14),
+                AppColors.emerald.withValues(alpha: 0.03),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -110,11 +122,21 @@ class ProfileScreen extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                        child: _mini(context, 'Ativos',
-                            Money.formatCompact(net.assetsCents), AppColors.positive)),
+                      child: _mini(
+                        context,
+                        'Ativos',
+                        Money.formatCompact(net.assetsCents),
+                        AppColors.positive,
+                      ),
+                    ),
                     Expanded(
-                        child: _mini(context, 'Passivos',
-                            Money.formatCompact(net.liabilitiesCents), AppColors.negative)),
+                      child: _mini(
+                        context,
+                        'Passivos',
+                        Money.formatCompact(net.liabilitiesCents),
+                        AppColors.negative,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -123,22 +145,32 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 20),
           SectionHeader(title: 'IFinance Assessor'),
           FinancialCard(
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const AssistantScreen())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AssistantScreen()),
+            ),
             child: Row(
               children: [
                 const CircleIcon(
-                    icon: Icons.auto_awesome, color: AppColors.emerald, size: 42),
+                  icon: Icons.auto_awesome,
+                  color: AppColors.emerald,
+                  size: 42,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Falar com o Assessor',
-                          style: t.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      Text('IA focada em despesas e entradas',
-                          style: t.bodySmall),
+                      Text(
+                        'Falar com o Assessor',
+                        style: t.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'IA focada em despesas e entradas',
+                        style: t.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -171,9 +203,13 @@ class ProfileScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: t.bodySmall?.copyWith(fontSize: 11)),
-        Text(value,
-            style: t.bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w700, color: color)),
+        Text(
+          value,
+          style: t.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -192,7 +228,9 @@ class ProfileScreen extends StatelessWidget {
             final screen = _screenFor(it.$3);
             if (screen != null) {
               Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => screen));
+                context,
+                MaterialPageRoute(builder: (_) => screen),
+              );
             }
           },
           child: Column(
@@ -201,11 +239,12 @@ class ProfileScreen extends StatelessWidget {
             children: [
               CircleIcon(icon: it.$1, color: AppColors.emerald, size: 40),
               const SizedBox(height: 10),
-              Text(it.$2,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                it.$2,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ],
           ),
         );

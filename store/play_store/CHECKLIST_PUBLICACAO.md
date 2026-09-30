@@ -13,7 +13,13 @@ store/play_store/
 │   ├── feature_graphic_1024x500.png   ✅ pronto (Banner da loja — obrigatório)
 │   └── app_icon_512x512.png           ✅ pronto (Ícone da loja — obrigatório)
 ├── screenshots/
-│   └── (capture aqui — ver seção 3)
+│   ├── 01_inicio.png          ✅ 1080×1920
+│   ├── 02_movimentacoes.png   ✅ 1080×1920
+│   ├── 03_assessor_ia.png     ✅ 1080×1920
+│   ├── 04_planejar.png        ✅ 1080×1920
+│   ├── 05_metas.png           ✅ 1080×1920
+│   ├── 06_perfil.png          ✅ 1080×1920
+│   └── 07_menu.png            ✅ 1080×1920
 ├── listing/
 │   ├── descricao_curta.txt            ✅ até 80 caracteres
 │   ├── descricao_completa.txt         ✅ até 4000 caracteres
@@ -31,7 +37,7 @@ store/play_store/
 |---|---|---|
 | Ícone da loja | 512×512 PNG (32 bits) | ✅ `app_icon_512x512.png` |
 | Gráfico de destaque | 1024×500 PNG/JPG | ✅ `feature_graphic_1024x500.png` |
-| Screenshots (telefone) | 2–8 imagens, 16:9 ou 9:16, mín. 320px | ⏳ capture (seção 3) |
+| Screenshots (telefone) | 2–8 imagens, 16:9 ou 9:16, mín. 320px | ✅ 7 imagens 1080×1920 |
 | Descrição curta | ≤ 80 caracteres | ✅ |
 | Descrição completa | ≤ 4000 caracteres | ✅ |
 | Política de privacidade | URL pública obrigatória | ⚠️ publique uma URL |
@@ -40,18 +46,22 @@ store/play_store/
 
 ## 3. Screenshots (captura)
 
-O IFinance é um app de finanças: capture as telas **Painel, Transações,
-Cartões, Metas e Orçamentos**. Formato recomendado: **1080×1920 (9:16)**.
+O IFinance é um app de finanças: capture as telas **Início, Movimentações,
+Assessor IA, Planejar, Metas, Perfil e o menu lateral (gaveta)**.
+Formato recomendado: **1080×1920 (9:16)**.
 
-### Opção A — captura automática (Chrome headless)
+### Opção A — captura automática (Chrome headless — recomendado)
+
+O script controla o app de verdade via Chrome DevTools Protocol (cliques na
+barra inferior + abertura do menu) e salva as imagens já em **1080×1920**:
 
 ```bash
-# 1) Sirva o build web localmente
+# 1) Sirva o build web localmente (use a porta 8099; a 5060 é bloqueada pelo Chrome)
 cd /home/user/flutter_app
-python3 -m http.server 8099 --directory build/web &
+python3 server.py 8099 &   # ou: python3 -m http.server 8099 --directory build/web &
 
-# 2) Rode o script de captura (usa google-chrome headless)
-python3 store/play_store/capturar_screenshots.py
+# 2) Rode o script de captura (usa google-chrome headless via CDP)
+python3 store/play_store/capturar_screenshots.py http://localhost:8099
 ```
 
 ### Opção B — captura manual (melhor qualidade)
@@ -74,7 +84,7 @@ python3 store/play_store/capturar_screenshots.py
 - [ ] `flutter analyze` limpo (0 issues) — ✅ feito
 - [ ] Ícone e feature graphic gerados — ✅ feito
 - [ ] Descrições (curta + completa) prontas — ✅ feito
-- [ ] Screenshots capturados — ⏳ (seção 3)
+- [x] Screenshots capturados (7 imagens 1080×1920)
 - [ ] **Keystore oficial gerado e guardado em local seguro** (ver seção 5)
 - [ ] Política de privacidade publicada em URL pública
 - [ ] `google-services.json` (se usar Firebase) com o package correto
