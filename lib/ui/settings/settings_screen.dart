@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/services/ai_config.dart';
+import '../../core/services/assessor_api.dart';
 import '../../core/services/passkey_api.dart';
 import '../../core/services/passkey_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -85,6 +87,9 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => _editCurrency(context, c, s),
             ),
           ),
+          const SizedBox(height: 22),
+          SectionHeader(title: 'Assistente IA'),
+          const _AiServerCard(),
           const SizedBox(height: 22),
           SectionHeader(title: 'Categorias'),
           FinancialCard(
@@ -717,6 +722,182 @@ class SettingsScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Cartão de configuração do servidor do Assessor IA (Opção B).
+/// Permite definir o endereço base da API, testar a conexão e alternar a
+/// verificação de SSL — tudo salvo localmente (sem recompilar o app).
+class _AiServerCard extends StatefulWidget {
+  const _AiServerCard();
+
+  @override
+  State<_AiServerCard> createState() => _AiServerCardState();
+}
+
+class _AiServerCardState extends State<_AiServerCard> {
+  final _ctrl = TextEditingController();
+  final _tokenCtrl = TextEditingController();
+  bool _busy = false;
+  String? _status;
+  bool? _statusOk;
+  bool _verifySsl = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.text = AiConfig.userBaseUrl.isNotEmpty
+        ? AiConfig.userBaseUrl
+        : AiConfig.compiledBaseUrl;
+    _tokenCtrl.text = AiConfig.token;
+    _verifySsl = AiConfig.verifySsl;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _tokenCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final url = _ctrl.text.trim();
+    if (url.isNotEmpty &&
+        !(url.startsWith('http://') || url.startsWith('https://'))) {
+      setState(() {
+        _status = 'O endereço deve começar com http:// ou https://';
+        _statusOk = false;
+      });
+      return;
+    }
+    await AiConfig.save(
+        baseUrl: url, token: _tokenCtrl.text, verifySsl: _verifySsl);
+    if (!mounted) return;
+    setState(() {
+      _status = url.isEmpty ? 'Endereço limpo.' : 'Endereço salvo com sucesso.';
+      _statusOk = true;
+    });
+  }
+
+  Future<void> _test() async {
+    setState(() {
+      _busy = true;
+      _status = 'Testando conexão...';
+      _statusOk = null;
+    });
+    // Garante que o teste use o que está nos campos (sem exigir salvar antes).
+    await AiConfig.save(baseUrl: _ctrl.text.trim(), token: _tokenCtrl.text);
+    final api = AssessorApi();
+    final ok = await api.health();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _statusOk = ok;
+      _status = ok
+          ? 'Conectado! A IA está ativa no servidor.'
+          : 'Não foi possível conectar. Confira o endereço, se o servidor está no ar e a chave da IA.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return FinancialCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'O Assessor IA usa um servidor (que guarda a chave da IA). '
+            'Defina aqui o endereço do seu servidor — assim você troca de '
+            'servidor sem reinstalar o app.',
+            style: t.bodySmall?.copyWith(height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Endereço do servidor da IA',
+              hintText: 'https://seu-servidor.com',
+              prefixIcon: Icon(Icons.cloud_outlined),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('Modo atual: ${AiConfig.describe()}', style: t.bodySmall),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _tokenCtrl,
+            autocorrect: false,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Token de acesso (opcional)',
+              hintText: 'Só se você configurou IFINANCE_API_TOKEN no servidor',
+              prefixIcon: Icon(Icons.key_outlined),
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Verificar certificado SSL'),
+            subtitle: const Text(
+                'Desative apenas em testes com certificado próprio'),
+            value: _verifySsl,
+            onChanged: (v) => setState(() => _verifySsl = v),
+          ),
+          if (_status != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: (_statusOk == true
+                        ? AppColors.positive
+                        : _statusOk == false
+                            ? AppColors.negative
+                            : AppColors.info)
+                    .withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _status!,
+                style: t.bodySmall?.copyWith(
+                  color: _statusOk == true
+                      ? AppColors.positive
+                      : _statusOk == false
+                          ? AppColors.negative
+                          : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _save,
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Salvar'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _test,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.wifi_tethering, size: 18),
+                  label: const Text('Testar'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

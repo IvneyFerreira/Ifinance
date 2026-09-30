@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/assessor_api.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/app_controller.dart';
+import '../settings/settings_screen.dart';
 import '../shell/app_drawer.dart';
 
 /// IFinance Assessor (cap. 36-39): assistente FINANCEIRO com IA real.
@@ -141,6 +142,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
             child: Text(
               _aiEnabled == true
                   ? 'IA financeira ativa • foco em despesas e entradas'
+                  : !_api.isConfigured
+                  ? 'Servidor da IA não configurado'
                   : _aiEnabled == false
                   ? 'IA indisponível no momento'
                   : 'Conectando à IA...',
@@ -157,6 +160,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       ),
       body: Column(
         children: [
+          if (!_api.isConfigured) _notConfiguredBanner(context),
           Expanded(
             child: ListView.builder(
               controller: _scroll,
@@ -243,6 +247,56 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  /// Aviso exibido quando não há servidor da IA configurado, com atalho
+  /// para as Configurações.
+  Widget _notConfiguredBanner(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cloud_off, color: AppColors.warning, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Assessor IA não configurado',
+                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Para conversar com a IA, informe o endereço do seu servidor '
+            '(que guarda a chave da IA). Leva 1 minuto e você pode mudar '
+            'depois sem reinstalar o app.',
+            style: t.bodySmall?.copyWith(height: 1.35),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () async {
+              await Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              // Recheca a conexão ao voltar das configurações.
+              _checkAi();
+            },
+            icon: const Icon(Icons.settings, size: 18),
+            label: const Text('Configurar servidor da IA'),
+          ),
+        ],
       ),
     );
   }

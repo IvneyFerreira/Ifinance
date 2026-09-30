@@ -58,6 +58,9 @@ LLM_ENABLED = bool(LLM_BASE and LLM_KEY)
 ALLOWED_ORIGINS = os.environ.get("IFINANCE_ALLOWED_ORIGINS", "*").strip()
 # Rate limit simples por IP (requisições/minuto). 0 desativa.
 RATE_LIMIT = int(os.environ.get("IFINANCE_RATE_LIMIT", "30") or "0")
+# Token de acesso opcional (se definido, o app precisa enviá-lo no cabeçalho
+# X-IFinance-Token). Recomendado para servidores públicos.
+API_TOKEN = os.environ.get("IFINANCE_API_TOKEN", "").strip()
 
 # --- Passkeys (WebAuthn) ----------------------------------------------------
 # Domínio do relying party (RP ID). Sem esquema. Ex.: app.ifinance.com.br
@@ -262,6 +265,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "model": LLM_MODEL if LLM_ENABLED else None,
                 "scope": "financas (despesas e entradas)",
                 "rate_limit_per_min": RATE_LIMIT,
+                "auth_required": bool(API_TOKEN),
                 "passkeys_enabled": PASSKEY_ENABLED,
             })
             return
@@ -301,6 +305,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         if not self.path.startswith("/api/assessor"):
             self._send_json(404, {"error": "not found"})
+            return
+
+        # Token opcional (se configurado no servidor).
+        if API_TOKEN and self.headers.get("X-IFinance-Token", "") != API_TOKEN:
+            self._send_json(401, {"error": "Não autorizado."})
             return
 
         # Rate limit por IP (protege o custo da IA).

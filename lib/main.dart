@@ -3,6 +3,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'core/services/ai_config.dart';
 import 'state/app_controller.dart';
 
 void main() async {
@@ -12,6 +13,12 @@ void main() async {
   // DateFormat('...', 'pt_BR'). Sem isto, o DateFormat lança LocaleDataException
   // na primeira renderização e a tela quebra (fica um bloco cinza no release).
   await initializeDateFormatting('pt_BR');
+
+  // Carrega o endereço do servidor do Assessor IA (configurado pelo usuário ou
+  // embutido no build via --dart-define=ASSESSOR_API_BASE).
+  try {
+    await AiConfig.load();
+  } catch (_) {}
 
   runApp(
     ChangeNotifierProvider(

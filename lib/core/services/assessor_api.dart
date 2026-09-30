@@ -1,42 +1,52 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 
 import '../finance/finance_engine.dart';
 import '../models/models.dart';
 import '../utils/date_helpers.dart';
 import '../utils/money.dart';
+import 'ai_config.dart';
+import 'http_client_factory.dart';
 
 /// IFinance Assessor — cliente da IA real.
 ///
 /// A IA roda no servidor (server.py) e recebe um CONTEXTO FINANCEIRO montado
 /// pelo FinanceEngine. A chave de API nunca sai do servidor.
+///
+/// O endereço do servidor é resolvido por [AiConfig]: pode ser definido pelo
+/// próprio usuário (Configurações → Assistente IA), embutido no build
+/// (--dart-define=ASSESSOR_API_BASE=...) ou usar a mesma origem do app web.
 class AssessorApi {
   AssessorApi({http.Client? client, this.baseUrl = ''})
-      : _client = client ?? http.Client();
+      : _client = client ?? createDefaultClient();
 
   final http.Client _client;
 
-  /// Base da API. Vazio = mesma origem (o servidor que serve o app web).
-  /// Pode ser sobrescrito via --dart-define=ASSESSOR_API_BASE=...
+  /// Base da API (vazio = usa a resolução dinâmica de [AiConfig]).
   final String baseUrl;
 
-  static const _define = String.fromEnvironment('ASSESSOR_API_BASE');
   static const _path = '/api/assessor';
 
-  String get _endpoint {
-    final base = baseUrl.isNotEmpty ? baseUrl : _define;
-    return '$base$_path';
-  }
+  /// Base efetiva: parâmetro explícito > configuração do app/compilação.
+  String get _resolveBase =>
+      baseUrl.isNotEmpty ? baseUrl.replaceAll(RegExp(r'/+$'), '') : AiConfig.baseUrl;
+
+  String get _endpoint => '$_resolveBase$_path';
+
+  /// `true` quando há um servidor configurado para consultar.
+  bool get isConfigured => _resolveBase.isNotEmpty;
 
   /// Verifica se a IA está habilitada no servidor.
   Future<bool> health() async {
+    final base = _resolveBase;
+    if (base.isEmpty) return false;
     try {
-      final base = baseUrl.isNotEmpty ? baseUrl : _define;
       final r = await _client
           .get(Uri.parse('$base/api/health'))
           .timeout(const Duration(seconds: 8));
       if (r.statusCode != 200) return false;
-      final d = jsonDecode(r.body) as Map<String, dynamic>;
+      final d = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
       return d['ai_enabled'] == true;
     } catch (_) {
       return false;
@@ -53,7 +63,11 @@ class AssessorApi {
     final res = await _client
         .post(
           Uri.parse(_endpoint),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            if (AiConfig.token.isNotEmpty)
+              'X-IFinance-Token': AiConfig.token,
+          },
           body: jsonEncode({
             'question': question,
             'context': context,

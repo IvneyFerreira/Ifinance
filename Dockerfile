@@ -1,21 +1,33 @@
-# IFinance — imagem do backend (sirva o build web + Assessor IA).
-# Uso:
+# IFinance — imagem do backend (serve o build web + Assessor IA + Passkeys).
+#
+# Build:
+#   flutter build web --release          # gera build/web
 #   docker build -t ifinance .
+#
+# Run:
 #   docker run -p 5060:5060 \
-#     -e OPENAI_BASE_URL=... -e OPENAI_API_KEY=... \
-#     -e IFINANCE_ALLOWED_ORIGINS="https://seu-app.com" \
+#     -e OPENAI_BASE_URL="https://api.openai.com/v1" \
+#     -e OPENAI_API_KEY="sk-sua-chave" \
+#     -e IFINANCE_LLM_MODEL="gpt-4o-mini" \
+#     -e IFINANCE_ALLOWED_ORIGINS="*" \
 #     ifinance
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Apenas o build web já compilado + servidor (leve e sem SDK do Flutter).
+# Build web já compilado + servidor (+ webauthn opcional para passkeys).
 COPY build/web ./build/web
 COPY server.py ./
+COPY webauthn.py ./
+COPY requirements.txt ./
+
+# Passkeys (WebAuthn) são opcionais: se a instalação falhar, o servidor
+# ainda sobe servindo o app e o Assessor IA.
+RUN pip install --no-cache-dir -r requirements.txt || true
 
 ENV PORT=5060 \
     WEB_DIR=/app/build/web \
-    IFINANCE_LLM_MODEL=gpt-5.4-mini
+    IFINANCE_LLM_MODEL=gpt-4o-mini
 
 EXPOSE 5060
 
