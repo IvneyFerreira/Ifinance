@@ -9,6 +9,7 @@ import '../../state/app_controller.dart';
 import '../forms/expense_form.dart';
 import '../forms/income_form.dart';
 import '../forms/transfer_form.dart';
+import '../widgets/attachment_section.dart';
 import '../widgets/transaction_tile.dart';
 
 /// Movimentações (cap. 13): busca, filtros, período, categorias, contas,
@@ -397,6 +398,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 _detailRow(ctx, 'Data', DateHelpers.fullDate.format(t.competenceDate)),
                 _detailRow(ctx, 'Status', _statusLabel(t)),
                 if (t.notes.isNotEmpty) _detailRow(ctx, 'Observação', t.notes),
+                if (!t.isTransfer) ...[
+                  const Divider(height: 22),
+                  AttachmentSection(transactionId: t.id),
+                ],
                 const SizedBox(height: 18),
                 Row(
                   children: [

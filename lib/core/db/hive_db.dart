@@ -25,11 +25,13 @@ class Db {
   static const String notifications = 'notifications';
   static const String audits = 'audit_logs';
   static const String simulations = 'simulations';
+  static const String attachments = 'attachments';
 
   static const List<String> all = [
     users, settings, accounts, categories, transactions, cards, purchases,
     installments, invoices, recurring, budgets, goals, goalContributions,
     assets, liabilities, subscriptions, notifications, audits, simulations,
+    attachments,
   ];
 
   static Future<void> init() async {

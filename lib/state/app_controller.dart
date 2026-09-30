@@ -47,6 +47,7 @@ class AppController extends ChangeNotifier {
   List<Asset> assets = [];
   List<Liability> liabilities = [];
   List<AppNotification> notifications = [];
+  List<Attachment> attachments = [];
 
   bool get loading => _loading;
   bool get bootstrapped => _bootstrapped;
@@ -120,6 +121,7 @@ class AppController extends ChangeNotifier {
     assets = repo.assets.byUser(uid);
     liabilities = repo.liabilities.byUser(uid);
     notifications = repo.notifications.byUser(uid);
+    attachments = repo.attachments.byUser(uid);
   }
 
   Future<void> _persistSession(String? userId) async {
@@ -346,6 +348,49 @@ class AppController extends ChangeNotifier {
       digest = sha256.convert([...digest.bytes, ...utf8.encode(salt)]);
     }
     return digest.toString();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Anexos / comprovantes (cap. 42)
+  // ---------------------------------------------------------------------------
+
+  /// Anexos vinculados a uma movimentação.
+  List<Attachment> attachmentsFor(String transactionId) => attachments
+      .where((a) => a.transactionId == transactionId)
+      .toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  int attachmentCountFor(String transactionId) =>
+      attachments.where((a) => a.transactionId == transactionId).length;
+
+  /// Guarda um comprovante (conteúdo em base64, nada sai do dispositivo).
+  Future<Attachment> addAttachment({
+    required String transactionId,
+    required String name,
+    required String mimeType,
+    required List<int> bytes,
+  }) async {
+    final att = Attachment(
+      id: repo.newId(),
+      userId: _user!.id,
+      transactionId: transactionId,
+      name: name,
+      mimeType: mimeType,
+      sizeBytes: bytes.length,
+      dataBase64: base64Encode(bytes),
+      createdAt: DateTime.now(),
+    );
+    await repo.attachments.put(att);
+    await repo.log(_user!.id, 'attach', 'Attachment',
+        entityId: att.id, details: name);
+    await refresh();
+    return att;
+  }
+
+  Future<void> deleteAttachment(Attachment att) async {
+    await repo.attachments.delete(att.id);
+    await repo.log(_user!.id, 'detach', 'Attachment', entityId: att.id);
+    await refresh();
   }
 
   // ---------------------------------------------------------------------------
@@ -1053,6 +1098,7 @@ class AppController extends ChangeNotifier {
         'assets': assets.map((e) => e.toMap()).toList(),
         'liabilities': liabilities.map((e) => e.toMap()).toList(),
         'notifications': notifications.map((e) => e.toMap()).toList(),
+        'attachments': attachments.map((e) => e.toMap()).toList(),
       };
 
   /// Backup completo (JSON) — inclui todas as coleções + metadados.
@@ -1203,6 +1249,7 @@ class AppController extends ChangeNotifier {
       repo.assets,
       repo.liabilities,
       repo.notifications,
+      repo.attachments,
     ]) {
       await box.clearUser(uid);
     }
@@ -1233,6 +1280,7 @@ class AppController extends ChangeNotifier {
     await load('assets', repo.assets, Asset.fromMap);
     await load('liabilities', repo.liabilities, Liability.fromMap);
     await load('notifications', repo.notifications, AppNotification.fromMap);
+    await load('attachments', repo.attachments, Attachment.fromMap);
 
     // Reaplica as configurações, se houver.
     final settingsMap = data['settings'];
@@ -1264,6 +1312,7 @@ class AppController extends ChangeNotifier {
       repo.assets,
       repo.liabilities,
       repo.notifications,
+      repo.attachments,
     ]) {
       await box.clearUser(uid);
     }

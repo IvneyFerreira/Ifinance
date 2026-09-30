@@ -164,6 +164,14 @@ class Repository {
     userIdOf: (s) => s.userId,
   );
 
+  late final Collection<Attachment> attachments = Collection(
+    boxName: Db.attachments,
+    fromMap: Attachment.fromMap,
+    toMap: (a) => a.toMap(),
+    idOf: (a) => a.id,
+    userIdOf: (a) => a.userId,
+  );
+
   String newId() => _uuid.v4();
 
   Future<void> log(String userId, String action, String entity,

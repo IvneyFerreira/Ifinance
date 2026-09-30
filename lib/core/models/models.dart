@@ -5,4 +5,5 @@ export 'credit_card.dart';
 export 'recurring_rule.dart';
 export 'planning.dart';
 export 'wealth.dart';
+export 'attachment.dart';
 export 'enums.dart';
