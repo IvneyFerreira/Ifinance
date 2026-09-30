@@ -22,10 +22,10 @@ class FinanceEngine {
     required this.userId,
     required List<Account> accounts,
     required List<Transaction> transactions,
-    required List<Category> categories,
+    required this.categories,
     required List<CreditCard> cards,
-    required List<Installment> installments,
-    required List<CardPurchase> purchases,
+    required this.installments,
+    required this.purchases,
     required List<RecurringRule> recurringRules,
     required List<Subscription> subscriptions,
     required this.settings,
@@ -33,10 +33,7 @@ class FinanceEngine {
         transactions = transactions
             .where((t) => !t.deleted && t.userId == userId)
             .toList(),
-        categories = categories,
         cards = cards.where((c) => !c.archived).toList(),
-        installments = installments,
-        purchases = purchases,
         recurringRules = recurringRules.where((r) => r.active).toList(),
         subscriptions = subscriptions.where((s) => s.active).toList();
 

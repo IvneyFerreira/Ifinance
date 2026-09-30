@@ -11,6 +11,7 @@ import '../budgets/budgets_screen.dart';
 import '../cards/cards_screen.dart';
 import '../data/data_screen.dart';
 import '../recurring/recurring_screen.dart';
+import '../settings/about_screen.dart';
 import '../settings/settings_screen.dart';
 import '../wealth/wealth_screen.dart';
 
@@ -155,6 +156,7 @@ class ProfileScreen extends StatelessWidget {
             (Icons.bar_chart, 'Relatórios', 'reports'),
             (Icons.backup_outlined, 'Importar / Exportar', 'data'),
             (Icons.settings_outlined, 'Configurações', 'settings'),
+            (Icons.info_outline, 'Sobre e Ajuda', 'about'),
           ]),
         ],
       ),
@@ -229,6 +231,8 @@ class ProfileScreen extends StatelessWidget {
         return const DataScreen();
       case 'settings':
         return const SettingsScreen();
+      case 'about':
+        return const AboutScreen();
       default:
         return null;
     }

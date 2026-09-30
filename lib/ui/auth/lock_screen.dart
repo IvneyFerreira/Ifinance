@@ -16,6 +16,20 @@ class LockScreen extends StatefulWidget {
 class _LockScreenState extends State<LockScreen> {
   final _pin = TextEditingController();
   String? _error;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final c = context.read<AppController>();
+      if (!c.biometricEnabled) return;
+      final avail = await c.biometricAvailable();
+      if (mounted) setState(() => _biometricAvailable = avail);
+      // Tenta desbloquear automaticamente com biometria ao abrir.
+      if (avail) await _biometric();
+    });
+  }
 
   @override
   void dispose() {
@@ -30,6 +44,14 @@ class _LockScreenState extends State<LockScreen> {
     } else {
       setState(() => _error = 'PIN incorreto. Tente novamente.');
       _pin.clear();
+    }
+  }
+
+  Future<void> _biometric() async {
+    final c = context.read<AppController>();
+    final ok = await c.unlockWithBiometric();
+    if (!ok && mounted) {
+      setState(() => _error = 'Biometria não reconhecida. Use o PIN.');
     }
   }
 
@@ -84,7 +106,16 @@ class _LockScreenState extends State<LockScreen> {
                   child: const Text('Desbloquear'),
                 ),
               ),
-              const SizedBox(height: 10),
+              if (_biometricAvailable) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: _biometric,
+                  icon: const Icon(Icons.fingerprint, color: AppColors.emerald),
+                  label: const Text('Usar biometria',
+                      style: TextStyle(color: AppColors.emerald)),
+                ),
+              ],
+              const SizedBox(height: 6),
               TextButton(
                 onPressed: () => context.read<AppController>().logout(),
                 child: const Text('Sair da conta',

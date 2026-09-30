@@ -2,7 +2,7 @@
 ///
 /// Interpreta arquivos de extrato bancário em dois formatos comuns:
 ///  - CSV (separador ';' ou ',') com colunas de data, descrição e valor.
-///  - OFX (SGML ou XML) com blocos <STMTTRN>.
+///  - OFX (SGML ou XML) com blocos `STMTTRN`.
 ///
 /// Nenhum dado sai do dispositivo: apenas transformamos texto em lançamentos.
 library;
@@ -191,7 +191,7 @@ class StatementImporter {
     return rows;
   }
 
-  /// Lê uma tag OFX, tolerando formatos SGML (<TAG>valor) e XML (<TAG>valor</TAG>).
+  /// Lê uma tag OFX, tolerando formatos SGML (`TAG valor`) e XML (`TAG valor /TAG`).
   static String? _ofxTag(String body, String tag) {
     final xml = RegExp('<$tag>(.*?)</$tag>',
         caseSensitive: false, dotAll: true).firstMatch(body);

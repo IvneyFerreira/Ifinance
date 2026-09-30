@@ -224,14 +224,21 @@ class _CardDetailScreenState extends State<CardDetailScreen> {
                   const SizedBox(height: 16),
                   MoneyDisplay(total, fontSize: 28),
                   const SizedBox(height: 16),
-                  ...c.accounts.map((a) => RadioListTile<String>(
-                        contentPadding: EdgeInsets.zero,
-                        value: a.id,
-                        groupValue: accountId,
-                        onChanged: (v) => setSheet(() => accountId = v),
-                        title: Text(a.name),
-                        subtitle: Text(Money.format(a.balanceCents)),
-                      )),
+                  RadioGroup<String>(
+                    groupValue: accountId,
+                    onChanged: (v) => setSheet(() => accountId = v),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: c.accounts
+                          .map((a) => RadioListTile<String>(
+                                contentPadding: EdgeInsets.zero,
+                                value: a.id,
+                                title: Text(a.name),
+                                subtitle: Text(Money.format(a.balanceCents)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: accountId == null

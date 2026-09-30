@@ -14,6 +14,9 @@ import '../core/services/auth_service.dart';
 import '../core/services/seed_service.dart';
 import '../core/services/statement_importer.dart';
 import '../core/services/totp_service.dart';
+import '../core/services/notification_service.dart';
+import '../core/services/biometric_service.dart';
+import '../core/services/notifications/reminder_spec.dart';
 import '../core/utils/category_icons.dart';
 import '../core/utils/date_helpers.dart';
 import '../core/utils/money.dart';
@@ -81,6 +84,9 @@ class AppController extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     await Db.init();
+    try {
+      await initNotifications();
+    } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString(_sessionKey);
@@ -377,6 +383,41 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Biometria (cap. 71) — desbloqueio por digital/rosto
+  // ---------------------------------------------------------------------------
+
+  bool get biometricEnabled => _settings.biometricEnabled;
+  bool get supportsBiometric => biometricSupported;
+
+  Future<bool> biometricAvailable() => biometricAvailability();
+
+  /// Ativa/desativa o desbloqueio biométrico (exige lock por PIN ativo).
+  Future<bool> setBiometric(bool enabled) async {
+    if (enabled) {
+      final ok = await authenticateBiometric(
+          reason: 'Confirme sua biometria para ativar o desbloqueio');
+      if (!ok) return false;
+    }
+    await updateSettings(
+        _settings.copyWith(biometricEnabled: enabled, lockEnabled: true));
+    await repo.log(_user!.id, enabled ? 'biometric_on' : 'biometric_off',
+        'User', entityId: _user!.id);
+    return true;
+  }
+
+  /// Tenta desbloquear com biometria. Retorna true se desbloqueado.
+  Future<bool> unlockWithBiometric() async {
+    if (!_settings.biometricEnabled) return false;
+    final ok = await authenticateBiometric(
+        reason: 'Desbloqueie o IFinance com sua biometria');
+    if (ok) {
+      _locked = false;
+      notifyListeners();
+    }
+    return ok;
+  }
+
   static String _pinSalt() {
     final rnd = Random.secure();
     final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
@@ -480,11 +521,29 @@ class AppController extends ChangeNotifier {
       remindersEnabled: enabled ?? _settings.remindersEnabled,
       reminderDaysBefore: daysBefore ?? _settings.reminderDaysBefore,
     ));
-    if (_settings.remindersEnabled) await regenerateReminders();
+    if (_settings.remindersEnabled) {
+      // Pede permissão e agenda as notificações nativas (Android/iOS).
+      final ok = await requestLocalNotificationPermission();
+      await regenerateReminders();
+      _reminderPermissionGranted = ok;
+    } else {
+      await cancelAllReminders();
+    }
+    notifyListeners();
   }
 
-  /// Recalcula os lembretes de contas a vencer/vencidas e os persiste na
-  /// central de notificações, evitando duplicatas.
+  bool _reminderPermissionGranted = false;
+  bool get reminderPermissionGranted => _reminderPermissionGranted;
+  bool get supportsNativeNotifications => notificationsSupported;
+
+  /// Solicita permissão de notificação (no-op no Web).
+  Future<bool> requestLocalNotificationPermission() async {
+    await initNotifications();
+    return requestNotificationPermission();
+  }
+
+  /// Recalcula os lembretes de contas a vencer/vencidas: grava na central
+  /// in-app e agenda as notificações nativas (Android/iOS).
   Future<int> regenerateReminders() async {
     if (_user == null) return 0;
     final uid = _user!.id;
@@ -495,6 +554,8 @@ class AppController extends ChangeNotifier {
 
     final existing = repo.notifications.byUser(uid);
     var created = 0;
+    final specs = <ReminderSpec>[];
+    var notifyId = 1000;
 
     for (final t in transactions) {
       if (t.deleted || t.isTransfer || t.isInvoicePayment) continue;
@@ -509,6 +570,18 @@ class AppController extends ChangeNotifier {
           ? 'Conta vencida: ${t.description}'
           : 'Vence em breve: ${t.description}';
       final dateKey = DateHelpers.isoDate(t.dueDate);
+      final message = '${Money.format(t.amountCents)} • vencimento $dateKey';
+
+      // Agenda notificação nativa com antecedência (08:00 do dia configurado).
+      final remindAt = due
+          .subtract(Duration(days: _settings.reminderDaysBefore))
+          .add(const Duration(hours: 8));
+      specs.add(ReminderSpec(
+        id: notifyId++,
+        title: title,
+        body: message,
+        when: overdue ? now.add(const Duration(minutes: 1)) : remindAt,
+      ));
 
       final dupe = existing.any((n) =>
           n.title == title && n.message.contains(dateKey));
@@ -518,13 +591,19 @@ class AppController extends ChangeNotifier {
         id: repo.newId(),
         userId: uid,
         title: title,
-        message: '${Money.format(t.amountCents)} • vencimento $dateKey',
+        message: message,
         severity:
             overdue ? InsightSeverity.warning : InsightSeverity.info,
         date: now,
       ));
       created++;
     }
+
+    // Agenda as notificações nativas (no-op no Web).
+    if (_settings.remindersEnabled) {
+      await scheduleReminders(specs);
+    }
+
     if (created > 0) await refresh();
     return created;
   }

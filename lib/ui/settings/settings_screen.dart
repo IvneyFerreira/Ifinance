@@ -120,6 +120,18 @@ class SettingsScreen extends StatelessWidget {
                 const Divider(height: 20),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  title: const Text('Desbloqueio por biometria'),
+                  subtitle: Text(s.biometricEnabled
+                      ? 'Use digital ou rosto para abrir'
+                      : 'Requer o bloqueio por PIN ativo'),
+                  value: s.biometricEnabled,
+                  onChanged: s.lockEnabled
+                      ? (v) => _toggleBiometric(context, c, v)
+                      : null,
+                ),
+                const Divider(height: 20),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: const Text('Autenticação em 2 fatores'),
                   subtitle: Text(s.twoFactorEnabled
                       ? 'Ativa (app autenticador)'
@@ -186,10 +198,11 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Sair da conta'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () async {
+                    final controller = context.read<AppController>();
                     final ok = await showConfirmDialog(context,
                         title: 'Sair da conta',
                         message: 'Deseja sair? Seus dados permanecem salvos.');
-                    if (ok) await context.read<AppController>().logout();
+                    if (ok) await controller.logout();
                   },
                 ),
                 ListTile(
@@ -199,6 +212,7 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Redefinir dados financeiros'),
                   subtitle: const Text('Apaga lançamentos e recomeça do zero'),
                   onTap: () async {
+                    final controller = context.read<AppController>();
                     final ok = await showConfirmDialog(context,
                         title: 'Redefinir dados',
                         message:
@@ -206,7 +220,7 @@ class SettingsScreen extends StatelessWidget {
                         confirmLabel: 'Redefinir',
                         destructive: true);
                     if (ok) {
-                      await context.read<AppController>().resetFinancialData();
+                      await controller.resetFinancialData();
                       if (context.mounted) {
                         showToast(context, 'Dados redefinidos.');
                       }
@@ -220,13 +234,14 @@ class SettingsScreen extends StatelessWidget {
                   title: const Text('Excluir conta e dados'),
                   subtitle: const Text('Ação permanente e irreversível'),
                   onTap: () async {
+                    final controller = context.read<AppController>();
                     final ok = await showConfirmDialog(context,
                         title: 'Excluir conta',
                         message:
                             'Isso removerá permanentemente todos os seus dados financeiros. Deseja continuar?',
                         confirmLabel: 'Excluir tudo',
                         destructive: true);
-                    if (ok) await context.read<AppController>().deleteAccount();
+                    if (ok) await controller.deleteAccount();
                   },
                 ),
               ],
@@ -317,8 +332,29 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _toggleTwoFactor(BuildContext context, AppController c, bool value) {
+  Future<void> _toggleBiometric(
+      BuildContext context, AppController c, bool value) async {
     if (value) {
+      final avail = await c.biometricAvailable();
+      if (!context.mounted) return;
+      if (!avail) {
+        showToast(context,
+            'Biometria indisponível neste dispositivo. Use o PIN.',
+            error: true);
+        return;
+      }
+    }
+    final ok = await c.setBiometric(value);
+    if (!context.mounted) return;
+    if (value && !ok) {
+      showToast(context, 'Não foi possível confirmar a biometria.', error: true);
+    } else {
+      showToast(context,
+          value ? 'Desbloqueio biométrico ativado.' : 'Biometria desativada.');
+    }
+  }
+
+  void _toggleTwoFactor(BuildContext context, AppController c, bool value) {    if (value) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TwoFactorSetupScreen()),

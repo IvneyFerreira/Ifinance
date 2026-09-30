@@ -429,17 +429,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     setState(() => _saving = true);
     try {
-      await _persistStep(6);
       final controller = context.read<AppController>();
+      await _persistStep(6);
       await controller.refresh();
-      final user = controller.user!;
       await _completeOnboarding();
       if (mounted) {
         showToast(context, 'Seu IFinance está pronto.');
       }
       // O root troca para o Shell automaticamente.
-      // ignore: unused_local_variable
-      final _ = user;
     } finally {
       if (mounted) setState(() => _saving = false);
     }

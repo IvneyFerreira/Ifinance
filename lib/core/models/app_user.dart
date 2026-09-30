@@ -111,6 +111,8 @@ class UserSettings {
   final bool remindersEnabled;
   /// Dias de antecedência para o lembrete de vencimento.
   final int reminderDaysBefore;
+  /// Desbloqueio por biometria (digital/rosto) — cap. 71.
+  final bool biometricEnabled;
 
   const UserSettings({
     required this.userId,
@@ -127,6 +129,7 @@ class UserSettings {
     this.totpSecret = '',
     this.remindersEnabled = false,
     this.reminderDaysBefore = 3,
+    this.biometricEnabled = false,
   });
 
   UserSettings copyWith({
@@ -143,6 +146,7 @@ class UserSettings {
     String? totpSecret,
     bool? remindersEnabled,
     int? reminderDaysBefore,
+    bool? biometricEnabled,
   }) {
     return UserSettings(
       userId: userId,
@@ -162,6 +166,7 @@ class UserSettings {
       totpSecret: totpSecret ?? this.totpSecret,
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
       reminderDaysBefore: reminderDaysBefore ?? this.reminderDaysBefore,
+      biometricEnabled: biometricEnabled ?? this.biometricEnabled,
     );
   }
 
@@ -181,6 +186,7 @@ class UserSettings {
         'totpSecret': totpSecret,
         'remindersEnabled': remindersEnabled,
         'reminderDaysBefore': reminderDaysBefore,
+        'biometricEnabled': biometricEnabled,
       };
 
   factory UserSettings.fromMap(Map<String, dynamic> m) => UserSettings(
@@ -204,5 +210,6 @@ class UserSettings {
         totpSecret: (m['totpSecret'] as String?) ?? '',
         remindersEnabled: (m['remindersEnabled'] as bool?) ?? false,
         reminderDaysBefore: (m['reminderDaysBefore'] as num?)?.toInt() ?? 3,
+        biometricEnabled: (m['biometricEnabled'] as bool?) ?? false,
       );
 }
