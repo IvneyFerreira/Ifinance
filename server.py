@@ -156,14 +156,27 @@ def _call_llm(messages, timeout=90):
     return (data["choices"][0]["message"]["content"] or "").strip()
 
 
+def _as_dict(value) -> dict:
+    """Garante que o valor seja um dict (tolerante a payloads malformados)."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value) -> list:
+    """Garante que o valor seja uma lista de dicts."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
 def _build_context_prompt(context: dict) -> str:
     """Transforma o contexto estruturado (vindo do FinanceEngine) em texto."""
+    context = _as_dict(context)
     lines = []
     lines.append("### CONTEXTO FINANCEIRO (despesas, entradas e controle)")
     lines.append(f"Data de referência: {context.get('today', datetime.now().strftime('%d/%m/%Y'))}")
     lines.append(f"Mês de referência: {context.get('monthLabel', '')}")
 
-    month = context.get("month", {}) or {}
+    month = _as_dict(context.get("month"))
     lines.append("\n**Resumo do mês**")
     lines.append(f"- Entradas (receitas) do mês: {month.get('income', 'R$ 0,00')}")
     lines.append(f"- Despesas do mês: {month.get('expense', 'R$ 0,00')}")
@@ -174,7 +187,7 @@ def _build_context_prompt(context: dict) -> str:
     lines.append(f"- Livre para gastar com segurança: {context.get('safeToSpend', 'R$ 0,00')}")
     lines.append(f"- Próximo recebimento: {context.get('nextIncome', 'sem previsão')}")
 
-    cats = context.get("topCategories", []) or []
+    cats = _as_list(context.get("topCategories"))
     lines.append("\n**Onde o usuário mais gastou neste mês**")
     if cats:
         for i, c in enumerate(cats, 1):
@@ -182,7 +195,7 @@ def _build_context_prompt(context: dict) -> str:
     else:
         lines.append("- Nenhuma despesa registrada neste mês.")
 
-    incomes = context.get("incomes", []) or []
+    incomes = _as_list(context.get("incomes"))
     lines.append("\n**Entradas / receitas do mês**")
     if incomes:
         for inc in incomes[:8]:
@@ -190,7 +203,7 @@ def _build_context_prompt(context: dict) -> str:
     else:
         lines.append("- Nenhuma receita registrada neste mês.")
 
-    recent = context.get("recentExpenses", []) or []
+    recent = _as_list(context.get("recentExpenses"))
     lines.append("\n**Últimas despesas registradas**")
     if recent:
         for r in recent[:10]:
@@ -198,15 +211,15 @@ def _build_context_prompt(context: dict) -> str:
     else:
         lines.append("- Sem despesas recentes.")
 
-    subs = context.get("subscriptions", {}) or {}
+    subs = _as_dict(context.get("subscriptions"))
     lines.append("\n**Assinaturas / recorrentes de despesa**")
     lines.append(f"- Custo mensal em assinaturas: {subs.get('monthly', 'R$ 0,00')}")
     lines.append(f"- Custo anual em assinaturas: {subs.get('annual', 'R$ 0,00')}")
     if subs.get("list"):
-        for s in subs["list"][:8]:
+        for s in _as_list(subs["list"])[:8]:
             lines.append(f"   • {s.get('name')}: {s.get('amount')} ({s.get('freq', '')})")
 
-    cards = context.get("cards", []) or []
+    cards = _as_list(context.get("cards"))
     lines.append("\n**Faturas de cartão (gastos)**")
     if cards:
         for c in cards:
@@ -214,7 +227,7 @@ def _build_context_prompt(context: dict) -> str:
     else:
         lines.append("- Nenhum cartão cadastrado.")
 
-    budgets = context.get("budgets", []) or []
+    budgets = _as_list(context.get("budgets"))
     lines.append("\n**Orçamentos de despesa**")
     if budgets:
         for b in budgets[:10]:
@@ -330,7 +343,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         question = (payload.get("question") or "").strip()
         context = payload.get("context") or {}
-        history = payload.get("history") or []
+        history = _as_list(payload.get("history"))
 
         if not question:
             self._send_json(400, {"error": "Pergunta vazia"})
