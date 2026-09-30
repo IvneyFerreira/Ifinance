@@ -7,8 +7,10 @@ import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
+import 'recurring_form.dart';
 
 /// Recorrências (cap. 22): regras semanais/mensais/anuais, com previsões.
+/// Toque em uma regra para editar; use o botão + para criar uma nova.
 class RecurringScreen extends StatelessWidget {
   const RecurringScreen({super.key});
 
@@ -18,20 +20,31 @@ class RecurringScreen extends StatelessWidget {
     final rules = c.recurringRules;
     return Scaffold(
       appBar: AppBar(title: const Text('Recorrências')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openForm(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Nova'),
+      ),
       body: rules.isEmpty
           ? const EmptyState(
               icon: Icons.autorenew,
               title: 'Nenhuma recorrência',
               message:
-                  'Cadastre gastos e receitas recorrentes. O IFinance projetará os próximos meses.',
+                  'Cadastre gastos e receitas recorrentes (ex.: aluguel). O IFinance projetará os próximos meses.',
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
               children: [
+                Text(
+                  'Toque em uma recorrência para editar o valor, o dia ou a conta.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
                 for (final r in rules)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: FinancialCard(
+                      onTap: () => _openForm(context, rule: r),
                       child: Row(
                         children: [
                           CircleIcon(
@@ -54,9 +67,17 @@ class RecurringScreen extends StatelessWidget {
                                         .titleSmall
                                         ?.copyWith(fontWeight: FontWeight.w700)),
                                 Text(
-                                  '${Labels.frequency(r.frequency)}${r.preferredDayOfMonth != null ? ' • dia ${r.preferredDayOfMonth}' : ''}',
+                                  '${Labels.frequency(r.frequency)}${r.preferredDayOfMonth != null ? ' • dia ${r.preferredDayOfMonth}' : ''} • ${DateHelpers.dayMonth.format(r.startDate)}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
+                                if (r.creditCardId != null)
+                                  Text(
+                                    'Cartão',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: AppColors.info),
+                                  ),
                               ],
                             ),
                           ),
@@ -79,6 +100,15 @@ class RecurringScreen extends StatelessWidget {
                   ),
               ],
             ),
+    );
+  }
+
+  void _openForm(BuildContext context, {RecurringRule? rule}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecurringFormScreen(editing: rule),
+      ),
     );
   }
 }

@@ -24,11 +24,26 @@ class TransactionsScreen extends StatefulWidget {
 
 enum _Filter { all, income, expense, card, transfer }
 
+/// Item de previsão (ocorrência futura de uma recorrência).
+class _Forecast {
+  final String label;
+  final int amountCents;
+  final DateTime date;
+  final bool isIncome;
+  const _Forecast({
+    required this.label,
+    required this.amountCents,
+    required this.date,
+    required this.isIncome,
+  });
+}
+
 class _TransactionsScreenState extends State<TransactionsScreen> {
   final _search = TextEditingController();
   _Filter _filter = _Filter.all;
   String? _categoryId;
   DateTimeRange? _range;
+  bool _showForecast = true;
 
   @override
   void dispose() {
@@ -36,10 +51,39 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     super.dispose();
   }
 
+  /// Ocorrências futuras de recorrências ainda não lançadas (próximos 90 dias).
+  List<_Forecast> _forecasts(AppController c) {
+    final today = DateHelpers.dateOnly(DateTime.now());
+    final until = DateHelpers.addDays(today, 90);
+    final ruleIds = c.recurringRules.map((r) => r.id).toSet();
+    final out = <_Forecast>[];
+    for (final e in c.engine.cashEvents(from: today, to: until)) {
+      if (e.confirmed) continue;
+      if (!ruleIds.contains(e.sourceId)) continue;
+      final isIncome = e.amountCents > 0;
+      out.add(_Forecast(
+        label: e.label.isEmpty ? (isIncome ? 'Receita' : 'Despesa') : e.label,
+        amountCents: e.amountCents,
+        date: e.date,
+        isIncome: isIncome,
+      ));
+    }
+    out.sort((a, b) => a.date.compareTo(b.date));
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
     final list = _applyFilters(c.transactions);
+    final allForecasts = _showForecast ? _forecasts(c) : const <_Forecast>[];
+    // Respeita o filtro de tipo (receita/despesa) nas previsões.
+    final forecasts = switch (_filter) {
+      _Filter.income => allForecasts.where((f) => f.isIncome).toList(),
+      _Filter.expense => allForecasts.where((f) => !f.isIncome).toList(),
+      _Filter.card || _Filter.transfer => const <_Forecast>[],
+      _Filter.all => allForecasts,
+    };
 
     // Agrupa por dia
     final grouped = <DateTime, List<Transaction>>{};
@@ -88,17 +132,39 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           _filterChips(),
           const SizedBox(height: 6),
           Expanded(
-            child: list.isEmpty
+            child: (list.isEmpty && forecasts.isEmpty && c.recurringRules.isEmpty)
                 ? const EmptyState(
                     icon: Icons.receipt_long_outlined,
                     title: 'Nenhuma movimentação',
                     message:
                         'Registre sua primeira despesa ou receita usando o botão +.',
                   )
-                : ListView.builder(
+                : (list.isEmpty
+                    ? ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+                        children: [
+                          const SizedBox(height: 40),
+                          const EmptyState(
+                            icon: Icons.receipt_long_outlined,
+                            title: 'Nenhuma movimentação lançada',
+                            message: 'Veja abaixo as previsões das suas recorrências.',
+                          ),
+                          if (_showForecast && forecasts.isNotEmpty)
+                            _forecastSection(context, forecasts),
+                        ],
+                      )
+                    : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                    itemCount: days.length,
+                    itemCount: days.length +
+                        (_showForecast
+                            ? (forecasts.isNotEmpty ? 1 : 0)
+                            : (c.recurringRules.isNotEmpty ? 1 : 0)),
                     itemBuilder: (_, i) {
+                      if (i == days.length) {
+                        return _showForecast
+                            ? _forecastSection(context, forecasts)
+                            : _forecastToggle(context);
+                      }
                       final day = days[i];
                       final items = grouped[day]!
                         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -156,7 +222,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         ],
                       );
                     },
-                  ),
+                  )),
           ),
         ],
       ),
@@ -165,6 +231,100 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   bool get _activeFilters =>
       _filter != _Filter.all || _categoryId != null || _range != null;
+
+  /// Seção de previsões (ocorrências futuras de recorrências).
+  Widget _forecastSection(BuildContext context, List<_Forecast> items) {
+    final t = Theme.of(context).textTheme;
+    final total = items.fold<int>(0, (s, f) => s + f.amountCents);
+    return Padding(
+      padding: const EdgeInsets.only(top: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_graph,
+                  size: 18, color: AppColors.info),
+              const SizedBox(width: 8),
+              Text(
+                'Previsões (próximos 90 dias)',
+                style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              MoneyDisplay(total, fontSize: 12, colorize: true, signed: true),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Ocultar previsões',
+                icon: const Icon(Icons.visibility_off_outlined, size: 18),
+                onPressed: () => setState(() => _showForecast = false),
+              ),
+            ],
+          ),
+          Text(
+            'Valores ainda não lançados, gerados pelas suas recorrências.',
+            style: t.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          FinancialCard(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(
+              children: [
+                for (var j = 0; j < items.length; j++) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        CircleIcon(
+                          icon: items[j].isIncome
+                              ? Icons.arrow_downward
+                              : Icons.arrow_upward,
+                          color: items[j].isIncome
+                              ? AppColors.positive
+                              : AppColors.negativeSoft,
+                          size: 34,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(items[j].label,
+                                  style: t.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              Text(
+                                'Previsto • ${DateHelpers.dayMonth.format(items[j].date)}',
+                                style: t.bodySmall
+                                    ?.copyWith(color: AppColors.info),
+                              ),
+                            ],
+                          ),
+                        ),
+                        MoneyDisplay(items[j].amountCents,
+                            fontSize: 14, colorize: true, signed: true),
+                      ],
+                    ),
+                  ),
+                  if (j != items.length - 1) const Divider(height: 1),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Botão para reexibir as previsões quando ocultas.
+  Widget _forecastToggle(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: OutlinedButton.icon(
+        onPressed: () => setState(() => _showForecast = true),
+        icon: const Icon(Icons.auto_graph, size: 18),
+        label: const Text('Mostrar previsões'),
+      ),
+    );
+  }
 
   List<Transaction> _applyFilters(List<Transaction> all) {
     return all.where((t) {

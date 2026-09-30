@@ -32,6 +32,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   bool _showMore = false;
   bool _saving = false;
   bool _isInvoicePayment = false;
+  bool _recurring = false;
+  RecurrenceFrequency _freq = RecurrenceFrequency.monthly;
 
   bool get _isEditing => widget.editing != null;
 
@@ -209,6 +211,27 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               value: _paid,
               onChanged: (v) => setState(() => _paid = v),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Despesa recorrente'),
+              subtitle: const Text(
+                  'Ex.: aluguel, internet. Aparece nas projeções dos próximos meses.'),
+              value: _recurring,
+              onChanged: (v) => setState(() => _recurring = v),
+            ),
+            if (_recurring) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: RecurrenceFrequency.values.map((f) {
+                  return ChoiceChip(
+                    label: Text(Labels.frequency(f)),
+                    selected: _freq == f,
+                    onSelected: (_) => setState(() => _freq = f),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
           const SizedBox(height: 24),
           FilledButton(
@@ -298,8 +321,32 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           notes: _notes.text.trim(),
         );
       }
+      if (_recurring) {
+        final now = DateTime.now();
+        await c.saveRecurring(RecurringRule(
+          id: c.repo.newId(),
+          userId: c.user!.id,
+          description: _description.text.trim(),
+          type: TransactionType.expense,
+          amountCents: cents,
+          accountId: _cardId == null ? _accountId : null,
+          categoryId: _categoryId,
+          creditCardId: _cardId,
+          frequency: _freq,
+          startDate: _date,
+          preferredDayOfMonth: _date.day,
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
       if (mounted) {
-        showToast(context, _isEditing ? 'Alterações salvas.' : 'Despesa registrada.');
+        showToast(
+            context,
+            _isEditing
+                ? 'Alterações salvas.'
+                : (_recurring
+                    ? 'Despesa e recorrência registradas.'
+                    : 'Despesa registrada.'));
         Navigator.pop(context);
       }
     } catch (err) {

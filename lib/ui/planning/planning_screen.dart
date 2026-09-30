@@ -8,6 +8,7 @@ import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../calendar/calendar_screen.dart';
 import '../cards/cards_screen.dart';
+import '../recurring/recurring_screen.dart';
 import '../simulator/simulator_screen.dart';
 import '../widgets/charts.dart';
 import '../shell/app_drawer.dart';
@@ -120,18 +121,40 @@ class _PlanningScreenState extends State<PlanningScreen> {
               Expanded(
                 child: _exploreCard(
                   context,
-                  Icons.calendar_month_outlined,
-                  'Calendário',
-                  CalendarScreen(),
+                  Icons.autorenew,
+                  'Recorrências',
+                  const RecurringScreen(),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _exploreCard(
                   context,
+                  Icons.calendar_month_outlined,
+                  'Calendário',
+                  CalendarScreen(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _exploreCard(
+                  context,
                   Icons.credit_card_outlined,
                   'Cartões',
                   const CardsScreen(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _exploreCard(
+                  context,
+                  Icons.subscriptions_outlined,
+                  'Assinaturas',
+                  const SubscriptionsScreen(),
                 ),
               ),
             ],
