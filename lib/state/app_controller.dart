@@ -18,6 +18,9 @@ import '../core/services/statement_importer.dart';
 import '../core/services/totp_service.dart';
 import '../core/services/notification_service.dart';
 import '../core/services/biometric_service.dart';
+import '../core/services/ai_config.dart';
+import '../core/services/sync_service.dart';
+import '../core/services/sync_crypto.dart';
 import '../core/services/passkey_service.dart';
 import '../core/services/passkey_api.dart';
 import '../core/services/notifications/reminder_spec.dart';
@@ -158,6 +161,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     // Com debounce: gera uma foto automática após qualquer alteração real.
     _scheduleAutoSnapshot();
+    _scheduleCloudPush();
   }
 
   // ---------------------------------------------------------------------------
@@ -171,15 +175,18 @@ class AppController extends ChangeNotifier {
   }) async {
     final user = await auth.register(name: name, email: email, password: password);
     _user = user;
+    rememberCloudSecret(password);
     await _persistSession(user.id);
     await _seedDefaultCategories();
     await _loadUserData();
     _beginAutoBackup();
+    _beginCloudBackup();
     notifyListeners();
   }
 
   /// Usuário autenticado por senha aguardando o segundo fator (2FA/TOTP).
   AppUser? _pendingTotpUser;
+  String? _pendingPassword;
   AppUser? get pendingTwoFactorUser => _pendingTotpUser;
 
   /// Login em dois passos:
@@ -187,14 +194,26 @@ class AppController extends ChangeNotifier {
   /// - Se tem 2FA: guarda o usuário pendente e retorna false
   ///   (a UI deve chamar [confirmTwoFactor]).
   Future<bool> login({required String email, required String password}) async {
-    final user = await auth.login(email: email, password: password);
+    AppUser user;
+    try {
+      user = await auth.login(email: email, password: password);
+    } on AuthException {
+      // A conta pode não existir neste aparelho (reinstalação/troca de celular).
+      // Tenta reconstruí-la a partir do backup cifrado na nuvem — se a senha
+      // estiver correta, o envelope abre e a conta + dados voltam sozinhos.
+      final recovered =
+          await pullCloudBackupIfEmpty(email: email, password: password);
+      if (!recovered) rethrow;
+      return true;
+    }
     final userSettings = repo.settings.findById(user.id);
     if (userSettings != null && userSettings.twoFactorEnabled) {
       _pendingTotpUser = user;
+      _pendingPassword = password;
       notifyListeners();
       return false;
     }
-    await _completeLogin(user);
+    await _completeLogin(user, password: password);
     return true;
   }
 
@@ -204,11 +223,11 @@ class AppController extends ChangeNotifier {
     if (pending == null) return false;
     final s = repo.settings.findById(pending.id);
     if (s == null || !s.twoFactorEnabled) {
-      await _completeLogin(pending);
+      await _completeLogin(pending, password: _pendingPassword);
       return true;
     }
     if (!TotpService.verify(s.totpSecret, code)) return false;
-    await _completeLogin(pending);
+    await _completeLogin(pending, password: _pendingPassword);
     return true;
   }
 
@@ -217,12 +236,16 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _completeLogin(AppUser user) async {
+  Future<void> _completeLogin(AppUser user, {String? password}) async {
     _pendingTotpUser = null;
     _user = user;
+    if (password != null && password.isNotEmpty) {
+      rememberCloudSecret(password);
+    }
     await _persistSession(user.id);
     await _loadUserData();
     _beginAutoBackup();
+    _beginCloudBackup();
     notifyListeners();
   }
 
@@ -260,7 +283,11 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     // Garante uma última foto dos dados antes de encerrar a sessão.
     await flushSnapshot();
+    await flushCloudBackup();
     _stopAutoBackup();
+    _stopCloud();
+    _cloudSecret = null;
+    _pendingPassword = null;
     auth.logout();
     _pendingTotpUser = null;
     _user = null;
@@ -1707,6 +1734,135 @@ class AppController extends ChangeNotifier {
     await _seedDefaultCategories();
     categories = repo.categories.byUser(_user!.id);
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Backup automático na nuvem (cap. 73) — conta e dados cifrados
+  // ---------------------------------------------------------------------------
+  //
+  // O backup INTEIRO (usuário + dados) é CIFRADO no aparelho com uma chave
+  // derivada da SENHA do usuário (PBKDF2 + AES-GCM). O servidor nunca vê a
+  // senha nem os dados em claro — guarda apenas um "envelope" opaco indexado
+  // por um id derivado do e-mail (SHA-256, não reversível).
+  //
+  // No login, se a conta não existir neste aparelho, baixamos o envelope e
+  // tentamos abri-lo com a senha digitada: se abrir, a senha confere e a conta
+  // + dados são recriados automaticamente (sem "restaurar backup" manual).
+
+  final SyncService cloud = SyncService();
+
+  String? _cloudSecret; // senha em memória, apenas durante a sessão
+  bool _cloudSyncedThisSession = false;
+  Timer? _cloudTimer;
+
+  bool get supportsCloudBackup => AiConfig.isConfigured;
+  bool get cloudBackupEnabled => _settings.cloudBackupEnabled;
+  DateTime? get cloudBackupAt => _settings.cloudBackupAt;
+  bool get cloudAvailableThisSession => _cloudSecret != null;
+
+  /// Guarda a senha da sessão para cifrar/decifrar o backup na nuvem.
+  void rememberCloudSecret(String password) => _cloudSecret = password;
+
+  /// `true` se há dados financeiros relevantes para enviar à nuvem.
+  bool get hasMeaningfulData =>
+      accounts.isNotEmpty ||
+      transactions.isNotEmpty ||
+      budgets.isNotEmpty ||
+      goals.isNotEmpty ||
+      recurringRules.isNotEmpty ||
+      cards.isNotEmpty;
+
+  /// Ativa/desativa o backup automático na nuvem.
+  Future<bool> setCloudBackup(bool enabled) async {
+    if (enabled) {
+      if (!await cloud.serverAvailable()) return false;
+      if (_cloudSecret == null || _cloudSecret!.isEmpty) return false;
+    }
+    await updateSettings(_settings.copyWith(cloudBackupEnabled: enabled));
+    if (enabled) unawaited(pushCloudBackup(reason: 'ativacao'));
+    return true;
+  }
+
+  /// Envia o backup cifrado (usuário + dados) para a nuvem.
+  Future<bool> pushCloudBackup({String reason = 'auto'}) async {
+    final user = _user;
+    if (user == null) return false;
+    final secret = _cloudSecret;
+    if (secret == null || secret.isEmpty) return false;
+    if (!_settings.cloudBackupEnabled && reason != 'manual') return false;
+    try {
+      final accountId = SyncCrypto.accountId(user.email);
+      final json = const JsonEncoder().convert(_snapshot());
+      final envelope =
+          await SyncCrypto.seal(password: secret, plaintextJson: json);
+      final ok = await cloud.save(accountId: accountId, envelope: envelope);
+      if (ok) {
+        _cloudSyncedThisSession = true;
+        await updateSettings(_settings.copyWith(cloudBackupAt: DateTime.now()));
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Se a conta local estiver vazia, tenta recuperar da nuvem abrindo o
+  /// envelope com [password]. Retorna true se recuperou.
+  Future<bool> pullCloudBackupIfEmpty({
+    required String email,
+    required String password,
+  }) async {
+    if (_user != null) return false; // já há sessão local
+    if (repo.users.all().isNotEmpty && repo.accounts.all().isNotEmpty) {
+      return false;
+    }
+    try {
+      if (!await cloud.serverAvailable()) return false;
+      final accountId = SyncCrypto.accountId(email);
+      final envelope = await cloud.load(accountId);
+      if (envelope == null) return false;
+      final plaintext =
+          await SyncCrypto.open(password: password, envelope: envelope);
+      final json = jsonDecode(plaintext) as Map<String, dynamic>;
+      final count = await restoreFromBackupJson(json);
+      if (count > 0) {
+        rememberCloudSecret(password);
+        _cloudSyncedThisSession = true;
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Agenda um envio para a nuvem (com debounce) após mudanças.
+  void _scheduleCloudPush() {
+    if (!_settings.cloudBackupEnabled) return;
+    if (_user == null || _cloudSecret == null) return;
+    _cloudTimer?.cancel();
+    _cloudTimer =
+        Timer(const Duration(seconds: 4), () => unawaited(pushCloudBackup()));
+  }
+
+  /// Mantém a nuvem em dia: envia o estado atual logo que a sessão começa.
+  void _beginCloudBackup() {
+    if (!_settings.cloudBackupEnabled) return;
+    if (_cloudSecret == null || _cloudSecret!.isEmpty) return;
+    if (_cloudSyncedThisSession) return;
+    unawaited(pushCloudBackup(reason: 'sessao'));
+  }
+
+  void _stopCloud() {
+    _cloudTimer?.cancel();
+    _cloudSyncedThisSession = false;
+  }
+
+  /// Executa um envio final (ex.: ao pausar o app). Aguarda o resultado.
+  Future<void> flushCloudBackup() async {
+    if (!_settings.cloudBackupEnabled) return;
+    if (_user == null || _cloudSecret == null) return;
+    await pushCloudBackup(reason: 'flush');
   }
 
   // ---------------------------------------------------------------------------

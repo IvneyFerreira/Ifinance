@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -142,73 +141,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
       _totp.clear();
     });
-  }
-
-  /// Restauração de um backup completo (JSON) a partir da tela de login.
-  ///
-  /// Útil após reinstalar o app ou trocar de aparelho: recria a conta do
-  /// usuário (nome, e-mail e senha) e todos os dados financeiros a partir do
-  /// arquivo exportado.
-  Future<void> _restoreFromBackup() async {
-    final controllerCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restaurar de um backup'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-                'Cole abaixo o conteúdo do backup (arquivo JSON exportado pelo '
-                'IFinance em "Importar / Exportar"). Sua conta e seus dados '
-                'serão recriados neste aparelho.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controllerCtrl,
-              maxLines: 6,
-              decoration: const InputDecoration(
-                hintText: '{ "app": "IFinance", "data": { ... } }',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Restaurar')),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    final controller = context.read<AppController>();
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final decoded = jsonDecode(controllerCtrl.text) as Map<String, dynamic>;
-      final count = await controller.restoreFromBackupJson(decoded);
-      if (!mounted) return;
-      setState(() => _busy = false);
-      if (count <= 0) {
-        setState(() =>
-            _error = 'Backup inválido ou vazio. Verifique o conteúdo colado.');
-        return;
-      }
-      showToast(context, 'Backup restaurado ($count registros). Bem-vindo de volta!');
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = 'Backup inválido. Verifique o conteúdo colado.';
-      });
-    }
   }
 
   @override
@@ -355,19 +287,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: const Text('Entrar com passkey'),
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: _busy ? null : _restoreFromBackup,
-                    icon: const Icon(Icons.restore, size: 18),
-                    label: const Text('Restaurar de um arquivo de backup'),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Trocou de aparelho ou reinstalou? Cole o backup (JSON) '
-                    'exportado na tela Importar/Exportar para voltar com seus dados.',
-                    textAlign: TextAlign.center,
-                    style: t.bodySmall,
-                  ),
                   const SizedBox(height: 14),
                   _footer(),
                 ],

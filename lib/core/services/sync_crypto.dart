@@ -13,8 +13,8 @@ import 'package:crypto/crypto.dart' as sha;
 /// inútil.
 ///
 /// Formato do "envelope" gravado no servidor:
-///   { "v": 1, "kdf": "pbkdf2-sha256", "iter": 120000,
-///     "salt": "<b64>", "blob": "<b64 nonce(12) || ciphertext+mac>" }
+///   { v: 1, kdf: pbkdf2-sha256, iter: 120000,
+///     salt: b64, blob: b64 (nonce(12) + ciphertext + mac) }
 class SyncCrypto {
   SyncCrypto._();
 
