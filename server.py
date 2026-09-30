@@ -1,33 +1,84 @@
 #!/usr/bin/env python3
 """
-IFinance — Servidor de preview + Assessor IA real.
+IFinance — Servidor (preview + Assessor IA real) — pronto para produção.
 
-Serve os arquivos estáticos do build web (build/web) e expõe um endpoint
-/api/assessor que conversa com um LLM real (via proxy compatível com OpenAI
-disponível no ambiente). A chave de API NUNCA é exposta ao cliente: fica
-somente aqui, no servidor.
+Serve os arquivos estáticos do build web (build/web) e expõe:
+  GET  /api/health    → status, versão e se a IA está ativa
+  POST /api/assessor  → conversa com um LLM real (proxy compatível com OpenAI)
+
+A chave da API nunca é exposta ao cliente: fica apenas aqui no servidor.
+
+Configuração por variáveis de ambiente:
+  PORT                    porta (default 5060)
+  WEB_DIR                 diretório do build web (default ./build/web)
+  OPENAI_BASE_URL         base do provedor compatível com OpenAI
+  OPENAI_API_KEY          chave (somente servidor)
+  IFINANCE_LLM_MODEL      modelo (default gpt-5.4-mini)
+  IFINANCE_ALLOWED_ORIGINS  CORS: "*" ou lista separada por vírgula
+  IFINANCE_RATE_LIMIT     requisições por minuto por IP (default 30; 0 = off)
 
 Uso:
     python3 server.py 5060
+    # ou: PORT=8080 WEB_DIR=./build/web python3 server.py
 """
 
 import json
 import os
 import sys
+import time
+import threading
 import http.server
 import socketserver
 import urllib.request
 import urllib.error
 from datetime import datetime
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5060
-WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "web")
+APP_VERSION = "1.0.0"
+
+PORT = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 5060))
+WEB_DIR = os.environ.get(
+    "WEB_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "web"),
+)
 
 # --- Recursos de IA (somente servidor) -------------------------------------
 LLM_BASE = os.environ.get("OPENAI_BASE_URL", "").rstrip("/")
 LLM_KEY = os.environ.get("OPENAI_API_KEY", "")
 LLM_MODEL = os.environ.get("IFINANCE_LLM_MODEL", "gpt-5.4-mini")
 LLM_ENABLED = bool(LLM_BASE and LLM_KEY)
+
+# CORS: "*" ou lista separada por vírgula de origens permitidas.
+ALLOWED_ORIGINS = os.environ.get("IFINANCE_ALLOWED_ORIGINS", "*").strip()
+# Rate limit simples por IP (requisições/minuto). 0 desativa.
+RATE_LIMIT = int(os.environ.get("IFINANCE_RATE_LIMIT", "30") or "0")
+
+_rate_lock = threading.Lock()
+_rate_buckets = {}  # ip -> [window_start_ts, count]
+
+
+def _rate_ok(ip: str) -> bool:
+    if RATE_LIMIT <= 0:
+        return True
+    now = time.time()
+    with _rate_lock:
+        start, count = _rate_buckets.get(ip, [now, 0])
+        if now - start >= 60:
+            start, count = now, 0
+        count += 1
+        _rate_buckets[ip] = [start, count]
+        return count <= RATE_LIMIT
+
+
+def _cors_headers(origin: str):
+    """Devolve (allow_origin, extra_headers) respeitando a configuração."""
+    if ALLOWED_ORIGINS == "*":
+        return "*", []
+    allowed = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
+    if origin and origin in allowed:
+        return origin, [("Vary", "Origin")]
+    return (allowed[0] if allowed else "*"), []
+
+
 
 SYSTEM_PROMPT = """Você é o Assessor Financeiro do IFinance, um assistente pessoal especializado EXCLUSIVAMENTE na vida financeira do usuário.
 
@@ -148,38 +199,62 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def _send_json(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        allow, extra = _cors_headers(self.headers.get("Origin", ""))
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", allow)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        for k, v in extra:
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
     def do_OPTIONS(self):
+        allow, extra = _cors_headers(self.headers.get("Origin", ""))
         self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", allow)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        for k, v in extra:
+            self.send_header(k, v)
         self.end_headers()
 
     def do_GET(self):
         if self.path.startswith("/api/health"):
             self._send_json(200, {
                 "status": "ok",
+                "version": APP_VERSION,
                 "ai_enabled": LLM_ENABLED,
                 "model": LLM_MODEL if LLM_ENABLED else None,
                 "scope": "financas (despesas e entradas)",
+                "rate_limit_per_min": RATE_LIMIT,
             })
             return
-        # Flutter web: web/ usa SPA. Fallback p/ index.html em rotas sem arquivo.
+        # Flutter web (SPA): se o caminho não for um arquivo, serve index.html.
         return super().do_GET()
+
+    def send_head(self):
+        # Fallback SPA: rotas sem arquivo (ex.: /relatorios) caem em index.html.
+        path = self.translate_path(self.path)
+        if not os.path.exists(path) and not self.path.startswith("/api/"):
+            self.path = "/index.html"
+        return super().send_head()
 
     def do_POST(self):
         if not self.path.startswith("/api/assessor"):
             self._send_json(404, {"error": "not found"})
             return
+
+        # Rate limit por IP (protege o custo da IA).
+        client_ip = self.client_address[0] if self.client_address else "?"
+        if not _rate_ok(client_ip):
+            self._send_json(429, {
+                "error": "Muitas requisições. Aguarde um instante e tente novamente."
+            })
+            return
+
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length) if length else b"{}"
@@ -229,8 +304,11 @@ class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == "__main__":
-    os.chdir(WEB_DIR)
+    WEB_DIR = os.path.abspath(WEB_DIR)
+    if os.path.isdir(WEB_DIR):
+        os.chdir(WEB_DIR)
     with ThreadingServer(("0.0.0.0", PORT), Handler) as httpd:
-        print(f"IFinance server em http://0.0.0.0:{PORT} | WEB_DIR={WEB_DIR}")
+        print(f"IFinance {APP_VERSION} em http://0.0.0.0:{PORT} | WEB_DIR={WEB_DIR}")
         print(f"Assessor IA: {'ATIVO' if LLM_ENABLED else 'DESLIGADO'} (modelo={LLM_MODEL})")
+        print(f"CORS: {ALLOWED_ORIGINS} | Rate limit: {RATE_LIMIT}/min")
         httpd.serve_forever()

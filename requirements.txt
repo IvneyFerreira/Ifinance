@@ -1,0 +1,6 @@
+# IFinance — dependências do backend (Assessor IA).
+# O servidor usa apenas a biblioteca padrão do Python (sem dependências
+# obrigatórias). Se você preferir um servidor de produção robusto, instale
+# o gunicorn + whitenoise e rode: gunicorn -w 2 -b 0.0.0.0:$PORT server:app
+#
+# gunicorn>=21.2.0
