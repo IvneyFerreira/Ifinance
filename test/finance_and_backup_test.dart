@@ -8,6 +8,7 @@ import 'package:ifinance/core/db/hive_db.dart';
 import 'package:ifinance/core/finance/finance_engine.dart';
 import 'package:ifinance/core/models/models.dart';
 import 'package:ifinance/core/services/backup_service.dart';
+import 'package:ifinance/core/utils/date_helpers.dart';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -21,30 +22,29 @@ FinanceEngine engineWith({
   List<RecurringRule> rules = const [],
   List<CreditCard> cards = const [],
   List<Installment> installments = const [],
-}) =>
-    FinanceEngine(
-      userId: uid,
-      accounts: accounts.isNotEmpty
-          ? accounts
-          : [
-              Account(
-                id: 'acc1',
-                userId: uid,
-                name: 'Conta',
-                balanceCents: 100000,
-                createdAt: _now,
-                updatedAt: _now,
-              ),
-            ],
-      transactions: txs,
-      categories: const [],
-      cards: cards,
-      installments: installments,
-      purchases: const [],
-      recurringRules: rules,
-      subscriptions: const [],
-      settings: const UserSettings(userId: uid),
-    );
+}) => FinanceEngine(
+  userId: uid,
+  accounts: accounts.isNotEmpty
+      ? accounts
+      : [
+          Account(
+            id: 'acc1',
+            userId: uid,
+            name: 'Conta',
+            balanceCents: 100000,
+            createdAt: _now,
+            updatedAt: _now,
+          ),
+        ],
+  transactions: txs,
+  categories: const [],
+  cards: cards,
+  installments: installments,
+  purchases: const [],
+  recurringRules: rules,
+  subscriptions: const [],
+  settings: const UserSettings(userId: uid),
+);
 
 final DateTime _now = DateTime.now();
 final DateTime _monthStart = DateTime(_now.year, _now.month, 1);
@@ -64,91 +64,96 @@ Transaction tx({
   bool isInvoicePayment = false,
   bool isTransfer = false,
   String? recurringRuleId,
-}) =>
-    Transaction(
-      id: id,
-      userId: uid,
-      accountId: 'acc1',
-      type: type,
-      description: description,
-      amountCents: amount,
-      competenceDate: competence ?? _day10,
-      dueDate: due ?? _day10,
-      paidAt: paidAt,
-      expenseStatus: expenseStatus ?? ExpenseStatus.pending,
-      incomeStatus: incomeStatus ?? IncomeStatus.expected,
-      creditCardId: creditCardId,
-      isInvoicePayment: isInvoicePayment,
-      isTransfer: isTransfer,
-      recurringRuleId: recurringRuleId,
-      createdAt: _now,
-      updatedAt: _now,
-    );
+}) => Transaction(
+  id: id,
+  userId: uid,
+  accountId: 'acc1',
+  type: type,
+  description: description,
+  amountCents: amount,
+  competenceDate: competence ?? _day10,
+  dueDate: due ?? _day10,
+  paidAt: paidAt,
+  expenseStatus: expenseStatus ?? ExpenseStatus.pending,
+  incomeStatus: incomeStatus ?? IncomeStatus.expected,
+  creditCardId: creditCardId,
+  isInvoicePayment: isInvoicePayment,
+  isTransfer: isTransfer,
+  recurringRuleId: recurringRuleId,
+  createdAt: _now,
+  updatedAt: _now,
+);
 
 void main() {
   group('Cálculos do mês (getMonthlySummary)', () {
     test('despesa cancelada NÃO entra no total', () {
-      final e = engineWith(txs: [
-        tx(
-          id: '1',
-          type: TransactionType.expense,
-          amount: 10000,
-          expenseStatus: ExpenseStatus.paid,
-          paidAt: _day10,
-        ),
-        tx(
-          id: '2',
-          type: TransactionType.expense,
-          amount: 5000,
-          expenseStatus: ExpenseStatus.cancelled,
-        ),
-      ]);
+      final e = engineWith(
+        txs: [
+          tx(
+            id: '1',
+            type: TransactionType.expense,
+            amount: 10000,
+            expenseStatus: ExpenseStatus.paid,
+            paidAt: _day10,
+          ),
+          tx(
+            id: '2',
+            type: TransactionType.expense,
+            amount: 5000,
+            expenseStatus: ExpenseStatus.cancelled,
+          ),
+        ],
+      );
       final s = e.getMonthlySummary(_monthStart);
       expect(s.expenseCents, 10000);
       expect(s.resultCents, -10000);
     });
 
     test('receita cancelada NÃO entra no total', () {
-      final e = engineWith(txs: [
-        tx(
-          id: '1',
-          type: TransactionType.income,
-          amount: 30000,
-          incomeStatus: IncomeStatus.received,
-          paidAt: _day10,
-        ),
-        tx(
-          id: '2',
-          type: TransactionType.income,
-          amount: 99999,
-          incomeStatus: IncomeStatus.cancelled,
-        ),
-      ]);
+      final e = engineWith(
+        txs: [
+          tx(
+            id: '1',
+            type: TransactionType.income,
+            amount: 30000,
+            incomeStatus: IncomeStatus.received,
+            paidAt: _day10,
+          ),
+          tx(
+            id: '2',
+            type: TransactionType.income,
+            amount: 99999,
+            incomeStatus: IncomeStatus.cancelled,
+          ),
+        ],
+      );
       final s = e.getMonthlySummary(_monthStart);
       expect(s.incomeCents, 30000);
     });
 
     test('transferências têm impacto ZERO no resultado', () {
-      final e = engineWith(txs: [
-        tx(
-          id: '1',
-          type: TransactionType.expense,
-          amount: 20000,
-          isTransfer: true,
-          description: 'Transferência (saída)',
-          expenseStatus: ExpenseStatus.paid,
-          paidAt: _day10,
-        ),
-        tx(
-          id: '2',
-          type: TransactionType.income,
-          amount: 20000,
-          isTransfer: true,
-          description: 'Transferência (entrada)',
-          incomeStatus: IncomeStatus.received,
-          paidAt: _day10,
-        ),
-      ]);
+      final e = engineWith(
+        txs: [
+          tx(
+            id: '1',
+            type: TransactionType.expense,
+            amount: 20000,
+            isTransfer: true,
+            description: 'Transferência (saída)',
+            expenseStatus: ExpenseStatus.paid,
+            paidAt: _day10,
+          ),
+          tx(
+            id: '2',
+            type: TransactionType.income,
+            amount: 20000,
+            isTransfer: true,
+            description: 'Transferência (entrada)',
+            incomeStatus: IncomeStatus.received,
+            paidAt: _day10,
+          ),
+        ],
+      );
       final s = e.getMonthlySummary(_monthStart);
       expect(s.incomeCents, 0);
       expect(s.expenseCents, 0);
@@ -156,24 +161,26 @@ void main() {
     });
 
     test('compra no cartão é despesa econômica; pagamento da fatura NÃO', () {
-      final e = engineWith(txs: [
-        tx(
-          id: '1',
-          type: TransactionType.expense,
-          amount: 50000,
-          creditCardId: 'card1',
-          expenseStatus: ExpenseStatus.paid,
-          paidAt: _day10,
-        ),
-        tx(
-          id: '2',
-          type: TransactionType.expense,
-          amount: 50000,
-          isInvoicePayment: true,
-          expenseStatus: ExpenseStatus.paid,
-          paidAt: _day10,
-        ),
-      ]);
+      final e = engineWith(
+        txs: [
+          tx(
+            id: '1',
+            type: TransactionType.expense,
+            amount: 50000,
+            creditCardId: 'card1',
+            expenseStatus: ExpenseStatus.paid,
+            paidAt: _day10,
+          ),
+          tx(
+            id: '2',
+            type: TransactionType.expense,
+            amount: 50000,
+            isInvoicePayment: true,
+            expenseStatus: ExpenseStatus.paid,
+            paidAt: _day10,
+          ),
+        ],
+      );
       final s = e.getMonthlySummary(_monthStart);
       // Só a compra conta (não conta em dobro com o pagamento da fatura).
       expect(s.expenseCents, 50000);
@@ -182,24 +189,26 @@ void main() {
 
   group('Recorrências (sem contagem em dobro)', () {
     RecurringRule rule({int? total}) => RecurringRule(
-          id: 'rule1',
-          userId: uid,
-          description: 'Aluguel',
-          type: TransactionType.expense,
-          amountCents: 250000,
-          accountId: 'acc1',
-          frequency: RecurrenceFrequency.monthly,
-          startDate: _now,
-          totalOccurrences: total,
-          preferredDayOfMonth: _now.day,
-          createdAt: _now,
-          updatedAt: _now,
-        );
+      id: 'rule1',
+      userId: uid,
+      description: 'Aluguel',
+      type: TransactionType.expense,
+      amountCents: 250000,
+      accountId: 'acc1',
+      frequency: RecurrenceFrequency.monthly,
+      startDate: _now,
+      totalOccurrences: total,
+      preferredDayOfMonth: _now.day,
+      createdAt: _now,
+      updatedAt: _now,
+    );
 
     test('ocorrência prevista (não lançada) aparece no caixa', () {
       final e = engineWith(rules: [rule(total: 1)]);
       final events = e.cashEvents(
-          from: _now, to: _now.add(const Duration(days: 31)));
+        from: _now,
+        to: _now.add(const Duration(days: 31)),
+      );
       final hits = events.where((ev) => ev.label == 'Aluguel').toList();
       expect(hits.length, 1);
       expect(hits.first.amountCents, -250000);
@@ -221,7 +230,9 @@ void main() {
         ],
       );
       final events = e.cashEvents(
-          from: _now, to: _now.add(const Duration(days: 31)));
+        from: _now,
+        to: _now.add(const Duration(days: 31)),
+      );
       final hits = events.where((ev) => ev.label == 'Aluguel').toList();
       // Só o lançamento manual; a recorrência equivalente é ignorada.
       expect(hits.length, 1);
@@ -292,11 +303,10 @@ void main() {
     test('um item corrompido não derruba a coleção inteira', () async {
       final box = Hive.box<Map>('transactions');
       await box.clear();
-      await box.put('ok', tx(
-        id: 'ok',
-        type: TransactionType.expense,
-        amount: 1000,
-      ).toMap());
+      await box.put(
+        'ok',
+        tx(id: 'ok', type: TransactionType.expense, amount: 1000).toMap(),
+      );
       // Linha inválida (sem id) — deve ser ignorada, não explodir.
       await box.put('bad', <String, dynamic>{'foo': 'bar'});
 
@@ -320,15 +330,15 @@ void main() {
     const userId = 'backup-user';
 
     Map<String, dynamic> sampleData(int n) => {
-          'user': {'id': userId, 'name': 'T'},
-          'accounts': [
-            for (var i = 0; i < n; i++)
-              {'id': 'a$i', 'userId': userId, 'balanceCents': 1000},
-          ],
-          'transactions': [
-            for (var i = 0; i < n; i++) {'id': 't$i', 'userId': userId},
-          ],
-        };
+      'user': {'id': userId, 'name': 'T'},
+      'accounts': [
+        for (var i = 0; i < n; i++)
+          {'id': 'a$i', 'userId': userId, 'balanceCents': 1000},
+      ],
+      'transactions': [
+        for (var i = 0; i < n; i++) {'id': 't$i', 'userId': userId},
+      ],
+    };
 
     setUpAll(() async {
       dir = Directory.systemTemp.createTempSync('ifinance_backup_');
@@ -383,28 +393,39 @@ void main() {
     test('base vazia é ignorada (não sobrescreve dados bons)', () async {
       final id = await BackupService.snapshotNow(
         userId: userId,
-        data: {'user': {'id': userId}, 'accounts': const []},
+        data: {
+          'user': {'id': userId},
+          'accounts': const [],
+        },
         reason: 'auto',
       );
       expect(id, isNull);
       expect(BackupService.listFor(userId), isEmpty);
     });
 
-    test('rotaciona mantendo no máximo ${BackupService.maxSnapshots}', () async {
-      for (var i = 1; i <= BackupService.maxSnapshots + 3; i++) {
-        await BackupService.snapshotNow(
-          userId: userId,
-          data: sampleData(i),
-          reason: 'auto',
+    test(
+      'rotaciona mantendo no máximo ${BackupService.maxSnapshots}',
+      () async {
+        for (var i = 1; i <= BackupService.maxSnapshots + 3; i++) {
+          await BackupService.snapshotNow(
+            userId: userId,
+            data: sampleData(i),
+            reason: 'auto',
+          );
+        }
+        expect(
+          BackupService.listFor(userId).length,
+          BackupService.maxSnapshots,
         );
-      }
-      expect(
-          BackupService.listFor(userId).length, BackupService.maxSnapshots);
-    });
+      },
+    );
 
     test('clearFor remove os snapshots do usuário', () async {
       await BackupService.snapshotNow(
-          userId: userId, data: sampleData(1), reason: 'auto');
+        userId: userId,
+        data: sampleData(1),
+        reason: 'auto',
+      );
       await BackupService.clearFor(userId);
       expect(BackupService.listFor(userId), isEmpty);
     });
@@ -450,6 +471,58 @@ void main() {
       expect(back.passwordHash, u.passwordHash);
       expect(back.passwordSalt, u.passwordSalt);
       expect(back.onboardingCompleted, isTrue);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Datas de recebimento (dia fixo / N-ésimo dia útil) — cap. 51
+  // ---------------------------------------------------------------------------
+  group('DateHelpers — dia fixo e dias úteis', () {
+    test('isBusinessDay distingue seg-sex de fim de semana', () {
+      // 2026-03-02 é segunda; 2026-03-07 é sábado.
+      expect(DateHelpers.isBusinessDay(DateTime(2026, 3, 2)), isTrue);
+      expect(DateHelpers.isBusinessDay(DateTime(2026, 3, 6)), isTrue); // sex
+      expect(DateHelpers.isBusinessDay(DateTime(2026, 3, 7)), isFalse); // sáb
+      expect(DateHelpers.isBusinessDay(DateTime(2026, 3, 8)), isFalse); // dom
+    });
+
+    test('nthBusinessDay calcula o 5º dia útil do mês', () {
+      // Março/2026: 1º dia útil = 02/03 (seg). 5º dia útil = 06/03 (sex).
+      final d = DateHelpers.nthBusinessDay(2026, 3, 5);
+      expect(d, isNotNull);
+      expect(d!.day, 6);
+      expect(DateHelpers.isBusinessDay(d), isTrue);
+    });
+
+    test('nthBusinessDay pula fins de semana', () {
+      // Agosto/2026: 01/08 é sábado. 1º dia útil = 03/08 (seg).
+      final d = DateHelpers.nthBusinessDay(2026, 8, 1);
+      expect(d!.day, 3);
+    });
+
+    test('nextFixedDay respeita o dia escolhido e é sempre >= hoje', () {
+      final from = DateTime(2026, 3, 1);
+      final d = DateHelpers.nextFixedDay(5, from: from);
+      expect(d.day, 5);
+      expect(d.month, 3);
+      // Se o dia já passou, vai para o mês seguinte.
+      final d2 = DateHelpers.nextFixedDay(5, from: DateTime(2026, 3, 20));
+      expect(d2.month, 4);
+      expect(d2.day, 5);
+    });
+
+    test('nextFixedDay trata dia 31 em mês curto (fevereiro)', () {
+      final d = DateHelpers.nextFixedDay(31, from: DateTime(2026, 2, 1));
+      expect(d.month, 2);
+      expect(d.day, 28); // clamp para o último dia de fevereiro/2026
+    });
+
+    test('nextNthBusinessDay retorna dia útil e não é no passado', () {
+      final from = DateTime(2026, 3, 1);
+      final d = DateHelpers.nextNthBusinessDay(5, from: from)!;
+      expect(DateHelpers.isBusinessDay(d), isTrue);
+      expect(d.isBefore(DateHelpers.dateOnly(from)), isFalse);
+      expect(d.day, 6); // 5º dia útil de março/2026
     });
   });
 }

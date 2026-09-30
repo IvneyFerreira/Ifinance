@@ -2,7 +2,7 @@ name: ifinance
 description: "IFinance — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
 publish_to: 'none'
 
-version: 1.0.5+6
+version: 1.0.6+7
 
 environment:
   sdk: ^3.9.2
