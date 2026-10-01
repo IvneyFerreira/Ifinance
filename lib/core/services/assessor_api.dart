@@ -150,6 +150,66 @@ class FinancialContext {
 
     final next = engine.getNextIncome();
 
+    // --- Previsões (o que AINDA vai acontecer) -------------------------------
+    // Sem isto a IA só enxergava o que já foi lançado no mês; agora ela recebe
+    // as ocorrências previstas das recorrências, faturas e lançamentos futuros.
+    final forecastUpcoming = engine
+        .upcomingEvents(limit: 15)
+        .where((e) => !e.confirmed)
+        .map((e) => {
+              'date': DateHelpers.dayMonth.format(e.date),
+              'when': DateHelpers.friendly(e.date),
+              'label': e.label,
+              'direction': e.amountCents >= 0 ? 'entrada' : 'saída',
+              'amount': Money.format(e.amountCents.abs()),
+            })
+        .toList();
+
+    // Previsto ainda NESTE mês (a partir de hoje).
+    final restEvents = engine.cashEvents(from: now, to: until)
+        .where((e) => !e.confirmed)
+        .toList();
+    var restIn = 0;
+    var restOut = 0;
+    for (final e in restEvents) {
+      if (e.amountCents >= 0) {
+        restIn += e.amountCents;
+      } else {
+        restOut += -e.amountCents;
+      }
+    }
+
+    // Projeção dos próximos 3 meses (previsto: recorrências + faturas).
+    final nextMonths = <Map<String, dynamic>>[];
+    for (var i = 0; i < 3; i++) {
+      final ref = DateTime(now.year, now.month + i, 1);
+      final mFrom = i == 0
+          ? DateHelpers.dateOnly(now)
+          : DateHelpers.startOfMonth(ref);
+      final mTo = DateHelpers.endOfMonth(ref);
+      final evs =
+          engine.cashEvents(from: mFrom, to: mTo).where((e) => !e.confirmed);
+      var inflow = 0;
+      var outflow = 0;
+      for (final e in evs) {
+        if (e.amountCents >= 0) {
+          inflow += e.amountCents;
+        } else {
+          outflow += -e.amountCents;
+        }
+      }
+      nextMonths.add({
+        'month': DateHelpers.monthLabel(ref, withYear: true),
+        'expectedIncome': Money.format(inflow),
+        'expectedExpense': Money.format(outflow),
+        'expectedResult': Money.format(inflow - outflow),
+      });
+    }
+
+    final lowest = engine.getLowestProjectedBalance(
+      until: DateHelpers.endOfMonth(DateTime(now.year, now.month + 2, 1)),
+    );
+
     return {
       'today': DateHelpers.friendly(now),
       'monthLabel': DateHelpers.monthLabel(now),
@@ -164,6 +224,19 @@ class FinancialContext {
         'result': Money.format(summary.resultCents),
         'savingsRate': Money.formatPercent(engine.savingsRate()),
         'committed': Money.format(engine.getCommittedAmount(until: until)),
+      },
+      'forecast': {
+        'remainingThisMonth': {
+          'income': Money.format(restIn),
+          'expense': Money.format(restOut),
+          'result': Money.format(restIn - restOut),
+        },
+        'upcoming': forecastUpcoming,
+        'nextMonths': nextMonths,
+        'lowestProjectedBalance': Money.format(lowest.balance),
+        'lowestProjectedBalanceDate': lowest.date == null
+            ? ''
+            : DateHelpers.dayMonth.format(lowest.date!),
       },
       'topCategories': top
           .map((e) => {

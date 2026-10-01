@@ -121,6 +121,7 @@ ESCOPO PERMITIDO (fale SOMENTE sobre isto):
 - Despesas e gastos (por categoria, orçamento, maiores gastos, cortes).
 - Entradas / receitas (quanto entrou, de onde vem a renda, próximo recebimento).
 - Saldo, comprometido, livre para gastar, projeção de fim de mês, fluxo do mês.
+- Previsões e projeções: o que ainda vai acontecer no mês e nos próximos meses (recorrências/assinaturas, faturas, próximos vencimentos e recebimentos).
 - Cartões e faturas, assinaturas/recorrentes, dívidas e metas financeiras.
 
 REGRAS OBRIGATÓRIAS:
@@ -202,6 +203,46 @@ def _build_context_prompt(context: dict) -> str:
             lines.append(f"- {inc.get('name')}: {inc.get('amount')} em {inc.get('date', '')}")
     else:
         lines.append("- Nenhuma receita registrada neste mês.")
+
+    # --- Previsões / projeções (o que AINDA vai acontecer) --------------------
+    forecast = _as_dict(context.get("forecast"))
+    if forecast:
+        lines.append("\n**PREVISÕES (o que ainda vai acontecer)**")
+        rest = _as_dict(forecast.get("remainingThisMonth"))
+        lines.append("Previsto ainda NESTE mês (a partir de hoje):")
+        lines.append(f"- Entradas previstas: {rest.get('income', 'R$ 0,00')}")
+        lines.append(f"- Saídas previstas: {rest.get('expense', 'R$ 0,00')}")
+        lines.append(f"- Resultado previsto do restante do mês: {rest.get('result', 'R$ 0,00')}")
+
+        upcoming = _as_list(forecast.get("upcoming"))
+        lines.append("\nPróximos vencimentos/recebimentos (ocorrências previstas):")
+        if upcoming:
+            for u in upcoming[:15]:
+                lines.append(
+                    f"- {u.get('date', '')} ({u.get('when', '')}) | {u.get('label')} | "
+                    f"{u.get('direction', '')} de {u.get('amount')}"
+                )
+        else:
+            lines.append("- Nenhuma ocorrência prevista no período.")
+
+        months = _as_list(forecast.get("nextMonths"))
+        lines.append("\nProjeção dos próximos meses (recorrências + faturas previstas):")
+        if months:
+            for m in months:
+                lines.append(
+                    f"- {m.get('month')}: entradas {m.get('expectedIncome')}, "
+                    f"saídas {m.get('expectedExpense')}, resultado {m.get('expectedResult')}"
+                )
+        else:
+            lines.append("- Sem projeção disponível.")
+
+        lpb = forecast.get("lowestProjectedBalance")
+        if lpb:
+            lpd = forecast.get("lowestProjectedBalanceDate", "")
+            lines.append(
+                f"\nMenor saldo projetado nos próximos meses: {lpb}"
+                + (f" (em {lpd})" if lpd else "")
+            )
 
     recent = _as_list(context.get("recentExpenses"))
     lines.append("\n**Últimas despesas registradas**")
