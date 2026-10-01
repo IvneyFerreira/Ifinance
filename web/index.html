@@ -32,6 +32,28 @@
   <title>IFinance</title>
   <link rel="manifest" href="manifest.json">
   <script>
+    // Limpeza de Service Worker/cache (evita "tela travada" no preview web).
+    // O IFinance é offline-only no dispositivo: os dados vivem no IndexedDB
+    // (Hive) e no localStorage. Removemos APENAS o Service Worker e o
+    // CacheStorage antigos — NÃO tocamos no IndexedDB, então nada é perdido.
+    (function () {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (r) { r.unregister(); });
+          });
+        }
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+          });
+        }
+      } catch (e) {
+        console.warn('[IFinance] limpeza de cache indisponível:', e);
+      }
+    })();
+  </script>
+  <script>
     // Persistência de armazenamento (PWA): pede ao navegador para NÃO
     // descartar o IndexedDB (Hive) nem o localStorage (preferências) sob
     // pressão de armazenamento — principal causa de "dados sumindo" numa
