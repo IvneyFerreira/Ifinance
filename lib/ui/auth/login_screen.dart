@@ -159,33 +159,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF059669)],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: const Center(
-                          child: Text('iF',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w800)),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('IFinance',
-                              style: t.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800)),
-                          Text('Personal Financial Command Center',
-                              style: t.bodySmall),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('IFinance',
+                                style: t.headlineSmall
+                                    ?.copyWith(fontWeight: FontWeight.w800)),
+                            Text('Controle financeiro na palma da sua mão',
+                                style: t.bodySmall),
+                            const SizedBox(height: 2),
+                            Text('By Ivoney Ferreira',
+                                style: t.bodySmall?.copyWith(
+                                    color: AppColors.gray400,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
                     ],
                   ),

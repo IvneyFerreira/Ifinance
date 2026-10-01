@@ -1,5 +1,5 @@
 name: ifinance
-description: "IFinance — Personal Financial Command Center. Sua vida financeira em movimento. Sob controle."
+description: "IFinance — Controle financeiro na palma da sua mão. By Ivoney Ferreira."
 publish_to: 'none'
 
 version: 1.0.6+7
@@ -26,7 +26,6 @@ dependencies:
   uuid: ^4.5.1
   google_fonts: ^6.3.2
   crypto: ^3.0.6
-  # Criptografia do backup na nuvem (AES-GCM no cliente)
   # IA real do Assessor (cliente HTTP)
   http: ^1.5.0
   pdf: ^3.12.0
@@ -48,3 +47,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
