@@ -78,3 +78,7 @@ void main() {
     });
   });
 }
+
+// Nota: a deduplicação por mês (Radar x lançamento real) é coberta pelos
+// testes de finance_engine em ambientes com transactions; aqui validamos o
+// núcleo de alinhamento de datas.

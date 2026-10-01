@@ -914,24 +914,32 @@ class FinanceEngine {
 
   /// Uma ocorrência de recorrência é considerada "já realizada" quando existe
   /// um lançamento real equivalente: vínculo explícito com a regra, OU mesma
-  /// descrição + mesmo valor + mesmo tipo numa janela de ±5 dias em torno da
-  /// ocorrência. Isso evita contar em dobro quando a recorrência também foi
-  /// lançada manualmente (sem `recurringRuleId`).
+  /// descrição + mesmo valor + mesmo tipo. A correspondência é feita por uma
+  /// janela de ±5 dias em torno da ocorrência e, para regras mensais+ (que têm
+  /// no máximo 1 ocorrência por mês), também pelo MESMO MÊS — assim o Radar não
+  /// mostra "duas vezes" a mesma receita/despesa quando a data variou um pouco.
   bool _isOccurrenceRealized(RecurringRule rule, DateTime occurrence) {
     final occ = DateHelpers.dateOnly(occurrence);
     final desc = rule.description.trim().toLowerCase();
+    final monthBased = rule.frequency != RecurrenceFrequency.weekly &&
+        rule.frequency != RecurrenceFrequency.biweekly &&
+        rule.frequency != RecurrenceFrequency.custom;
     for (final t in transactions) {
       if (t.deleted || t.isTransfer) continue;
       if (t.type != rule.type) continue;
       if (t.isIncome && t.incomeStatus == IncomeStatus.cancelled) continue;
       if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
       final d = DateHelpers.dateOnly(t.dueDate);
-      if (d.difference(occ).inDays.abs() > 5) continue;
       final sameRule = t.recurringRuleId == rule.id;
       final sameDesc = desc.isNotEmpty &&
           t.description.trim().toLowerCase() == desc &&
           t.amountCents == rule.amountCents;
-      if (sameRule || sameDesc) return true;
+      if (!sameRule && !sameDesc) continue;
+      // Janela próxima: considera realizado.
+      if (d.difference(occ).inDays.abs() <= 5) return true;
+      // Regras mensais+: lançamento equivalente no mesmo mês já é a ocorrência
+      // daquele mês (a data pode ter variado por feriado/dia útil).
+      if (monthBased && DateHelpers.isSameMonth(d, occ)) return true;
     }
     return false;
   }

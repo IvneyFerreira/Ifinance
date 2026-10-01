@@ -316,6 +316,11 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     setState(() => _saving = true);
     final c = context.read<AppController>();
     final e = widget.editing;
+    // Quando a receita é recorrente (mensal+) com dia definido, o lançamento
+    // usa a MESMA data resolvida (5º dia útil / dia fixo ajustado) — assim o
+    // Radar e a lista de recorrências mostram a mesma data, sem duplicar.
+    final resolvedDate =
+        (_recurring && _showsDaySelector) ? _resolvedStart() : _expectedDate;
     try {
       if (e != null) {
         await c.updateTransaction(
@@ -325,10 +330,10 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
             amountCents: cents,
             categoryId: _categoryId,
             accountId: _accountId,
-            competenceDate: _expectedDate,
-            dueDate: _expectedDate,
+            competenceDate: resolvedDate,
+            dueDate: resolvedDate,
             notes: _notes.text.trim(),
-            paidAt: _received ? (_receivedDate ?? _expectedDate) : null,
+            paidAt: _received ? (_receivedDate ?? resolvedDate) : null,
             clearPaidAt: !_received,
             incomeStatus: _received
                 ? IncomeStatus.received
@@ -342,7 +347,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
           amountCents: cents,
           accountId: _accountId!,
           categoryId: _categoryId,
-          date: _expectedDate,
+          date: resolvedDate,
           received: _received,
           notes: _notes.text.trim(),
         );

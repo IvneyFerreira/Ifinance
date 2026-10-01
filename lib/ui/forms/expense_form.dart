@@ -386,6 +386,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     setState(() => _saving = true);
     final c = context.read<AppController>();
     final e = widget.editing;
+    // Despesa recorrente (mensal+) com dia definido: o lançamento usa a MESMA
+    // data resolvida (dia fixo / N-ésimo dia útil) da recorrência — evita
+    // datas divergentes entre o Radar e a lista de recorrências.
+    final resolvedDate =
+        (_recurring && _showsDaySelector) ? _resolvedStart() : _date;
     try {
       if (e != null) {
         if (e.purchaseId != null) {
@@ -409,11 +414,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               categoryId: _categoryId,
               accountId: _cardId == null ? _accountId : null,
               creditCardId: _cardId,
-              competenceDate: _date,
-              dueDate: _date,
+              competenceDate: resolvedDate,
+              dueDate: resolvedDate,
               paymentMethod: _method,
               notes: _notes.text.trim(),
-              paidAt: _paid ? (_date) : null,
+              paidAt: _paid ? (resolvedDate) : null,
               clearPaidAt: !_paid,
               expenseStatus: _paid ? ExpenseStatus.paid : ExpenseStatus.pending,
               updatedAt: DateTime.now(),
@@ -435,7 +440,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           amountCents: cents,
           accountId: _accountId!,
           categoryId: _categoryId,
-          date: _date,
+          date: resolvedDate,
           method: _method,
           paid: _paid,
           notes: _notes.text.trim(),
