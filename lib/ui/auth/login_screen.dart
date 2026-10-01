@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -173,23 +172,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('IFinance',
-                                style: t.headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.w800)),
-                            Text('Controle financeiro na palma da sua mão',
-                                style: t.bodySmall),
+                            Text(
+                              'IFinance',
+                              style: t.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              'Controle financeiro na palma da sua mão',
+                              style: t.bodySmall,
+                            ),
                             const SizedBox(height: 2),
-                            Text('By Ivoney Ferreira',
-                                style: t.bodySmall?.copyWith(
-                                    color: AppColors.gray400,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              'By Ivoney Ferreira',
+                              style: t.bodySmall?.copyWith(
+                                color: AppColors.gray400,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 28),
-                  Text(_title(), style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    _title(),
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 6),
                   Text(_subtitle(), style: t.bodyMedium),
                   const SizedBox(height: 24),
@@ -217,16 +227,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _password,
                     obscureText: _obscure,
                     decoration: InputDecoration(
-                      labelText: _mode == _Mode.forgot
-                          ? 'Nova senha'
-                          : 'Senha',
+                      labelText: _mode == _Mode.forgot ? 'Nova senha' : 'Senha',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined),
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
+                        icon: Icon(
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
                   ),
@@ -247,20 +256,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppColors.negative.withValues(alpha: 0.1),
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.md),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         border: Border.all(
-                            color: AppColors.negative.withValues(alpha: 0.35)),
+                          color: AppColors.negative.withValues(alpha: 0.35),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.negative, size: 18),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.negative,
+                            size: 18,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(_error!,
-                                style: t.bodySmall
-                                    ?.copyWith(color: AppColors.negative)),
+                            child: Text(
+                              _error!,
+                              style: t.bodySmall?.copyWith(
+                                color: AppColors.negative,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -274,11 +289,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : Text(_buttonLabel()),
                   ),
-                  if (_mode == _Mode.login && context.watch<AppController>().passkeysConfigured) ...[
+                  if (_mode == _Mode.login &&
+                      context.watch<AppController>().passkeysConfigured) ...[
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _loginPasskey,
@@ -315,16 +333,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      ),
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Icon(Icons.verified_user_outlined,
-                        color: Colors.white, size: 32),
+                    child: const Icon(
+                      Icons.verified_user_outlined,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(height: 24),
-                  Text('Verificação em 2 etapas',
-                      style:
-                          t.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    'Verificação em 2 etapas',
+                    style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     'Abra seu app autenticador e digite o código de 6 dígitos.',
@@ -354,7 +377,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Confirmar'),
                   ),
@@ -372,22 +397,23 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  String _title() => switch (_mode) {        _Mode.login => 'Bem-vindo de volta',
-        _Mode.register => 'Criar sua conta',
-        _Mode.forgot => 'Recuperar senha',
-      };
+  String _title() => switch (_mode) {
+    _Mode.login => 'Bem-vindo de volta',
+    _Mode.register => 'Criar sua conta',
+    _Mode.forgot => 'Recuperar senha',
+  };
 
   String _subtitle() => switch (_mode) {
-        _Mode.login => 'Acesse para colocar sua vida financeira sob controle.',
-        _Mode.register => 'Comece agora a organizar seu dinheiro.',
-        _Mode.forgot => 'Informe seu e-mail e defina uma nova senha.',
-      };
+    _Mode.login => 'Acesse para colocar sua vida financeira sob controle.',
+    _Mode.register => 'Comece agora a organizar seu dinheiro.',
+    _Mode.forgot => 'Informe seu e-mail e defina uma nova senha.',
+  };
 
   String _buttonLabel() => switch (_mode) {
-        _Mode.login => 'Entrar',
-        _Mode.register => 'Criar conta',
-        _Mode.forgot => 'Redefinir senha',
-      };
+    _Mode.login => 'Entrar',
+    _Mode.register => 'Criar conta',
+    _Mode.forgot => 'Redefinir senha',
+  };
 
   Widget _footer() {
     final t = Theme.of(context).textTheme;

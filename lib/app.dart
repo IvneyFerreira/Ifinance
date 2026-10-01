@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/models/models.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'state/app_controller.dart';
 import 'ui/auth/lock_screen.dart';
@@ -111,38 +112,35 @@ class _Splash extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  'iF',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 38,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/icon/app_icon.png',
+                width: 88,
+                height: 88,
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(height: 18),
             Text(
               'IFinance',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
-              'Sua vida financeira em movimento. Sob controle.',
+              'Controle financeiro na palma da sua mão',
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'By Ivoney Ferreira',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.gray400,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

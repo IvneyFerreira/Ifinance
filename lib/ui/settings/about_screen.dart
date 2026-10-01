@@ -20,30 +20,33 @@ class AboutScreen extends StatelessWidget {
           Center(
             child: Column(
               children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFF10B981), Color(0xFF059669)]),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text('iF',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('IFinance',
-                    style: t.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  'IFinance',
+                  style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 Text('Versão $appVersion', style: t.bodySmall),
                 const SizedBox(height: 4),
-                Text('Sua vida financeira em movimento. Sob controle.',
-                    style: t.bodySmall, textAlign: TextAlign.center),
+                Text(
+                  'Controle financeiro na palma da sua mão.',
+                  style: t.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'By Ivoney Ferreira',
+                  style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -75,18 +78,33 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           SectionHeader(title: 'Perguntas frequentes'),
-          _faq(context, 'Como registro uma despesa?',
-              'Toque no botão + e escolha Despesa, ou use o atalho rápido na Home.'),
-          _faq(context, 'Como funciona a IA (Assessor)?',
-              'O Assessor é focado em finanças: ajuda com despesas, entradas, saldo, cartões e orçamento. Ele recusa perguntas fora desse escopo.'),
-          _faq(context, 'Meus dados ficam seguros?',
-              'Sim. Tudo é guardado no seu dispositivo (banco local). Você pode fazer backup, exportar CSV/PDF e restaurar quando quiser.'),
-          _faq(context, 'Como proteger o app?',
-              'Em Configurações → Segurança você ativa o bloqueio por PIN, '
-              'o desbloqueio por biometria e a autenticação em 2 fatores.'),
-          _faq(context, 'Como recebo lembretes de contas?',
-              'Em Configurações → Lembretes, ative os avisos e escolha a '
-              'antecedência. As notificações aparecem no sino e no sistema.'),
+          _faq(
+            context,
+            'Como registro uma despesa?',
+            'Toque no botão + e escolha Despesa, ou use o atalho rápido na Home.',
+          ),
+          _faq(
+            context,
+            'Como funciona a IA (Assessor)?',
+            'O Assessor é focado em finanças: ajuda com despesas, entradas, saldo, cartões e orçamento. Ele recusa perguntas fora desse escopo.',
+          ),
+          _faq(
+            context,
+            'Meus dados ficam seguros?',
+            'Sim. Tudo é guardado no seu dispositivo (banco local). Você pode fazer backup, exportar CSV/PDF e restaurar quando quiser.',
+          ),
+          _faq(
+            context,
+            'Como proteger o app?',
+            'Em Configurações → Segurança você ativa o bloqueio por PIN, '
+                'o desbloqueio por biometria e a autenticação em 2 fatores.',
+          ),
+          _faq(
+            context,
+            'Como recebo lembretes de contas?',
+            'Em Configurações → Lembretes, ative os avisos e escolha a '
+                'antecedência. As notificações aparecem no sino e no sistema.',
+          ),
           const SizedBox(height: 22),
           SectionHeader(title: 'Sobre'),
           FinancialCard(
@@ -102,8 +120,10 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Center(
-            child: Text('© 2026 IFinance',
-                style: t.bodySmall?.copyWith(color: AppColors.gray400)),
+            child: Text(
+              '© 2026 IFinance',
+              style: t.bodySmall?.copyWith(color: AppColors.gray400),
+            ),
           ),
         ],
       ),
@@ -116,8 +136,11 @@ class AboutScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_outline,
-              size: 16, color: AppColors.emerald),
+          const Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: AppColors.emerald,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
@@ -136,8 +159,10 @@ class AboutScreen extends StatelessWidget {
           tilePadding: EdgeInsets.zero,
           childrenPadding: const EdgeInsets.only(bottom: 8),
           iconColor: AppColors.emerald,
-          title: Text(q,
-              style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          title: Text(
+            q,
+            style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
           children: [
             Align(
               alignment: Alignment.centerLeft,
@@ -154,8 +179,7 @@ class AboutScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: Text(label, style: t.bodyMedium)),
-        Text(value,
-            style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+        Text(value, style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
       ],
     );
   }
