@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
@@ -34,6 +35,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   bool _isInvoicePayment = false;
   bool _recurring = false;
   RecurrenceFrequency _freq = RecurrenceFrequency.monthly;
+  bool _useBusinessDay = false; // dia fixo x N-ésimo dia útil (mensal+)
+  int? _preferredDay;
 
   bool get _isEditing => widget.editing != null;
 
@@ -231,6 +234,65 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   );
                 }).toList(),
               ),
+              if (_showsDaySelector) ...[
+                const SizedBox(height: 14),
+                Text('Dia do vencimento',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(
+                  'Escolha o dia fixo do mês ou um dia útil '
+                  '(ex.: 5º dia útil). Se o dia fixo cair em fim de semana, '
+                  'o vencimento vai para o primeiro dia útil seguinte.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                SegmentedButton<_DayMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _DayMode.fixed,
+                      icon: Icon(Icons.event_outlined, size: 18),
+                      label: Text('Dia fixo'),
+                    ),
+                    ButtonSegment(
+                      value: _DayMode.businessDay,
+                      icon: Icon(Icons.work_outline, size: 18),
+                      label: Text('Dia útil'),
+                    ),
+                  ],
+                  selected: {
+                    _useBusinessDay ? _DayMode.businessDay : _DayMode.fixed,
+                  },
+                  onSelectionChanged: (s) => setState(() {
+                    _useBusinessDay = s.first == _DayMode.businessDay;
+                    _preferredDay ??= _date.day;
+                  }),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue: _preferredDay ?? _date.day,
+                  decoration: InputDecoration(
+                    labelText: _useBusinessDay ? 'Qual dia útil' : 'Dia do mês',
+                    prefixIcon: Icon(
+                      _useBusinessDay
+                          ? Icons.work_outline
+                          : Icons.calendar_today_outlined,
+                    ),
+                  ),
+                  items: [
+                    for (var d = 1; d <= (_useBusinessDay ? 10 : 31); d++)
+                      DropdownMenuItem<int>(
+                        value: d,
+                        child: Text(_useBusinessDay ? '$dº dia útil' : 'Dia $d'),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _preferredDay = v),
+                ),
+                const SizedBox(height: 10),
+                _dayPreview(Theme.of(context).textTheme),
+              ],
             ],
           ],
           const SizedBox(height: 24),
@@ -243,6 +305,54 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : Text(_isEditing ? 'Salvar alterações' : 'Salvar despesa'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool get _showsDaySelector =>
+      _freq != RecurrenceFrequency.weekly &&
+      _freq != RecurrenceFrequency.biweekly &&
+      _freq != RecurrenceFrequency.custom;
+
+  DateTime _resolvedStart() {
+    if (!_showsDaySelector) return _date;
+    final day = _preferredDay ?? _date.day;
+    if (_useBusinessDay) {
+      return DateHelpers.nextNthBusinessDay(day, from: _date) ?? _date;
+    }
+    return DateHelpers.nextBusinessDayOnOrAfter(
+      DateHelpers.nextFixedDay(day, from: _date),
+    );
+  }
+
+  Widget _dayPreview(TextTheme t) {
+    final next = _resolvedStart();
+    final label = _useBusinessDay
+        ? '${DateHelpers.weekdayName(next)}, ${DateHelpers.fullDate.format(next)} '
+              '(${_preferredDay ?? _date.day}º dia útil)'
+        : '${DateHelpers.weekdayName(next)}, ${DateHelpers.fullDate.format(next)}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.event_available, color: AppColors.info, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Próximo vencimento: $label',
+              style: t.bodySmall?.copyWith(
+                color: AppColors.info,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -333,8 +443,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           categoryId: _categoryId,
           creditCardId: _cardId,
           frequency: _freq,
-          startDate: _date,
-          preferredDayOfMonth: _date.day,
+          startDate: _resolvedStart(),
+          preferredDayOfMonth:
+              _showsDaySelector ? (_preferredDay ?? _date.day) : null,
+          useBusinessDay: _showsDaySelector && _useBusinessDay,
           createdAt: now,
           updatedAt: now,
         ));
@@ -360,3 +472,6 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     }
   }
 }
+
+/// Forma do vencimento mensal: dia fixo do mês ou N-ésimo dia útil.
+enum _DayMode { fixed, businessDay }
