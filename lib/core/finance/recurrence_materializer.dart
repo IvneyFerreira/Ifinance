@@ -25,7 +25,9 @@ class RecurrenceMaterializer {
     }
 
     var count = 0;
-    var cursor = start;
+    // A 1ª ocorrência de regras mensais+ é alinhada ao dia preferencial
+    // (ex.: 5º dia útil) — nunca fica presa a uma `startDate` desalinhada.
+    var cursor = _initialCursor(rule);
     // Proteção contra loops infinitos.
     var guard = 0;
 
@@ -47,6 +49,52 @@ class RecurrenceMaterializer {
     return result;
   }
 
+  /// Próxima ocorrência da regra a partir de [from] (inclusive) — usada por
+  /// telas que mostram "próxima" (ex.: lista de recorrências). Garante a mesma
+  /// data exibida no Radar/projeções.
+  static DateTime? nextOccurrence(RecurringRule rule, {DateTime? from}) {
+    final base = DateHelpers.dateOnly(from ?? DateTime.now());
+    if (!rule.active) return null;
+    final horizonEnd = DateHelpers.addMonths(base, 61);
+    final occ = occurrencesInWindow(rule, base, horizonEnd);
+    return occ.isEmpty ? null : occ.first;
+  }
+
+  /// Primeira ocorrência da série. Para frequências mensais+ com dia
+  /// preferencial, é a data alinhada ao dia no mês da `startDate`; se essa data
+  /// já tiver passado da `startDate`, avança para o mês seguinte.
+  static DateTime _initialCursor(RecurringRule rule) {
+    final start = DateHelpers.dateOnly(rule.startDate);
+    if (!_isMonthBased(rule.frequency) || rule.preferredDayOfMonth == null) {
+      return start;
+    }
+    var candidate = _occurrenceInMonth(rule, start.year, start.month);
+    if (candidate.isBefore(start)) {
+      final nm = DateTime(start.year, start.month + 1, 1);
+      candidate = _occurrenceInMonth(rule, nm.year, nm.month);
+    }
+    return candidate;
+  }
+
+  static bool _isMonthBased(RecurrenceFrequency f) =>
+      f != RecurrenceFrequency.weekly &&
+      f != RecurrenceFrequency.biweekly &&
+      f != RecurrenceFrequency.custom;
+
+  /// Data de ocorrência no mês informado conforme o dia preferencial da regra
+  /// (N-ésimo dia útil quando [RecurringRule.useBusinessDay]; caso contrário,
+  /// dia fixo — movido para o 1º dia útil seguinte se cair em fim de semana).
+  static DateTime _occurrenceInMonth(RecurringRule rule, int year, int month) {
+    final day = (rule.preferredDayOfMonth ??
+            DateHelpers.dateOnly(rule.startDate).day)
+        .clamp(1, DateHelpers.daysInMonth(year, month));
+    if (rule.useBusinessDay) {
+      final nth = DateHelpers.nthBusinessDay(year, month, day);
+      if (nth != null) return nth;
+    }
+    return DateHelpers.businessDayAdjusted(year, month, day);
+  }
+
   static DateTime _next(RecurringRule rule, DateTime current) {
     switch (rule.frequency) {
       case RecurrenceFrequency.weekly:
@@ -54,40 +102,15 @@ class RecurrenceMaterializer {
       case RecurrenceFrequency.biweekly:
         return DateHelpers.addDays(current, 14);
       case RecurrenceFrequency.monthly:
-        return _addMonthKeepDay(
-          current,
-          1,
-          rule.preferredDayOfMonth,
-          rule.useBusinessDay,
-        );
+        return _addMonthsOccurrence(rule, current, 1);
       case RecurrenceFrequency.bimonthly:
-        return _addMonthKeepDay(
-          current,
-          2,
-          rule.preferredDayOfMonth,
-          rule.useBusinessDay,
-        );
+        return _addMonthsOccurrence(rule, current, 2);
       case RecurrenceFrequency.quarterly:
-        return _addMonthKeepDay(
-          current,
-          3,
-          rule.preferredDayOfMonth,
-          rule.useBusinessDay,
-        );
+        return _addMonthsOccurrence(rule, current, 3);
       case RecurrenceFrequency.semiannual:
-        return _addMonthKeepDay(
-          current,
-          6,
-          rule.preferredDayOfMonth,
-          rule.useBusinessDay,
-        );
+        return _addMonthsOccurrence(rule, current, 6);
       case RecurrenceFrequency.annual:
-        return _addMonthKeepDay(
-          current,
-          12,
-          rule.preferredDayOfMonth,
-          rule.useBusinessDay,
-        );
+        return _addMonthsOccurrence(rule, current, 12);
       case RecurrenceFrequency.custom:
         return DateHelpers.addDays(
           current,
@@ -96,29 +119,15 @@ class RecurrenceMaterializer {
     }
   }
 
-  /// Calcula a ocorrência do mês seguinte (mensal+).
-  ///
-  /// - [useBusinessDay] = true → [preferredDay] é o **N-ésimo dia útil** do mês
-  ///   (ex.: 5º dia útil, comum em salários).
-  /// - [useBusinessDay] = false → [preferredDay] é um **dia fixo**; se cair em
-  ///   fim de semana, é movido para o primeiro dia útil seguinte.
-  static DateTime _addMonthKeepDay(
+  /// Ocorrência [months] meses após [current], alinhada ao dia preferencial
+  /// (N-ésimo dia útil, ou dia fixo com rolagem de fim de semana).
+  static DateTime _addMonthsOccurrence(
+    RecurringRule rule,
     DateTime current,
     int months,
-    int? preferredDay,
-    bool useBusinessDay,
   ) {
     final base = DateHelpers.addMonths(current, months);
-    if (preferredDay == null) return base;
-    final day = preferredDay.clamp(
-      1,
-      DateHelpers.daysInMonth(base.year, base.month),
-    );
-    if (useBusinessDay) {
-      final nth = DateHelpers.nthBusinessDay(base.year, base.month, day);
-      if (nth != null) return nth;
-    }
-    // Dia fixo: rola para o primeiro dia útil se cair em fim de semana.
-    return DateHelpers.businessDayAdjusted(base.year, base.month, day);
+    if (rule.preferredDayOfMonth == null) return base;
+    return _occurrenceInMonth(rule, base.year, base.month);
   }
 }

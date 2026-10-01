@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/finance/recurrence_materializer.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
@@ -110,8 +111,8 @@ class RecurringScreen extends StatelessWidget {
     );
   }
 
-  /// Linha de detalhe: frequência + dia (fixo, "5º dia útil", ou mesmo dia
-  /// da data) + próxima ocorrência.
+  /// Linha de detalhe: frequência + dia (fixo, "Nº dia útil", ou mesmo dia
+  /// da data) + próxima ocorrência (calculada da mesma forma que o Radar).
   String _subtitle(RecurringRule r) {
     String dayPart = '';
     if (r.preferredDayOfMonth != null) {
@@ -119,8 +120,11 @@ class RecurringScreen extends StatelessWidget {
           ? ' • ${r.preferredDayOfMonth}º dia útil'
           : ' • dia ${r.preferredDayOfMonth}';
     }
+    final next = r.active
+        ? RecurrenceMaterializer.nextOccurrence(r) ?? r.startDate
+        : r.startDate;
     return '${Labels.frequency(r.frequency)}$dayPart'
-        ' • próxima ${DateHelpers.dayMonth.format(r.startDate)}';
+        ' • próxima ${DateHelpers.dayMonth.format(next)}';
   }
 }
 
