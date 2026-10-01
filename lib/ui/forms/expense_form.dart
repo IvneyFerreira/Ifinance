@@ -266,13 +266,19 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     _useBusinessDay ? _DayMode.businessDay : _DayMode.fixed,
                   },
                   onSelectionChanged: (s) => setState(() {
-                    _useBusinessDay = s.first == _DayMode.businessDay;
-                    _preferredDay ??= _date.day;
+                    final toBusiness = s.first == _DayMode.businessDay;
+                    _useBusinessDay = toBusiness;
+                    // Mantém o dia dentro do intervalo do modo (1..10 / 1..31).
+                    _preferredDay = (_preferredDay ?? _date.day)
+                        .clamp(1, _dayMax(toBusiness));
                   }),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  initialValue: _preferredDay ?? _date.day,
+                  // Reconstrói ao trocar o modo: evita valor fora da lista.
+                  key: ValueKey('expense-day-$_useBusinessDay'),
+                  initialValue:
+                      (_preferredDay ?? _date.day).clamp(1, _dayMaxFor),
                   decoration: InputDecoration(
                     labelText: _useBusinessDay ? 'Qual dia útil' : 'Dia do mês',
                     prefixIcon: Icon(
@@ -282,7 +288,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                     ),
                   ),
                   items: [
-                    for (var d = 1; d <= (_useBusinessDay ? 10 : 31); d++)
+                    for (var d = 1; d <= _dayMaxFor; d++)
                       DropdownMenuItem<int>(
                         value: d,
                         child: Text(_useBusinessDay ? '$dº dia útil' : 'Dia $d'),
@@ -315,6 +321,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       _freq != RecurrenceFrequency.weekly &&
       _freq != RecurrenceFrequency.biweekly &&
       _freq != RecurrenceFrequency.custom;
+
+  /// Máximo de opções de dia conforme o modo (10 dias úteis / 31 dias fixos).
+  int _dayMax(bool businessDay) => businessDay ? 10 : 31;
+  int get _dayMaxFor => _dayMax(_useBusinessDay);
 
   DateTime _resolvedStart() {
     if (!_showsDaySelector) return _date;
