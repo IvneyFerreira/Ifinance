@@ -162,4 +162,22 @@ class DateHelpers {
       day.clamp(1, daysInMonth(next.year, next.month)),
     );
   }
+
+  /// O próprio dia [d] se for útil; senão, o primeiro dia útil seguinte
+  /// (ex.: sábado/domingo → segunda-feira).
+  static DateTime nextBusinessDayOnOrAfter(DateTime d) {
+    var x = dateOnly(d);
+    // Limite de segurança (evita loop infinito em caso de dados estranhos).
+    for (var i = 0; i < 7 && !isBusinessDay(x); i++) {
+      x = DateTime(x.year, x.month, x.day + 1);
+    }
+    return x;
+  }
+
+  /// Data do dia [day] no mês informado, ajustada para o **primeiro dia útil
+  /// seguinte** caso caia em fim de semana (ex.: dia 5 no sábado → segunda).
+  static DateTime businessDayAdjusted(int year, int month, int day) {
+    final clamped = day.clamp(1, daysInMonth(year, month));
+    return nextBusinessDayOnOrAfter(DateTime(year, month, clamped));
+  }
 }

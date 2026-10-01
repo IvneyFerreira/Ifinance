@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/models.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/date_helpers.dart';
 import '../../core/utils/money_input_formatter.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
@@ -29,6 +31,8 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
   bool _received = false;
   bool _recurring = false;
   RecurrenceFrequency _freq = RecurrenceFrequency.monthly;
+  bool _useBusinessDay = false; // 5º dia útil x dia fixo (mensal+)
+  int? _preferredDay;
   bool _saving = false;
 
   @override
@@ -63,7 +67,9 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
     return Scaffold(
-      appBar: AppBar(title: Text(widget.editing == null ? 'Nova receita' : 'Editar receita')),
+      appBar: AppBar(
+        title: Text(widget.editing == null ? 'Nova receita' : 'Editar receita'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -104,9 +110,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Recebida'),
-            subtitle: Text(_received
-                ? 'Confirmada'
-                : 'Prevista'),
+            subtitle: Text(_received ? 'Confirmada' : 'Prevista'),
             value: _received,
             onChanged: (v) => setState(() {
               _received = v;
@@ -138,6 +142,68 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                 );
               }).toList(),
             ),
+            if (_showsDaySelector) ...[
+              const SizedBox(height: 14),
+              _label('Data de recebimento'),
+              const SizedBox(height: 6),
+              Text(
+                'Salários costumam cair no 5º dia útil; se não for o caso, '
+                'escolha o dia do mês.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              SegmentedButton<_DayMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: _DayMode.fixed,
+                    icon: Icon(Icons.event_outlined, size: 18),
+                    label: Text('Dia fixo'),
+                  ),
+                  ButtonSegment(
+                    value: _DayMode.businessDay,
+                    icon: Icon(Icons.work_outline, size: 18),
+                    label: Text('Dia útil'),
+                  ),
+                ],
+                selected: {
+                  _useBusinessDay ? _DayMode.businessDay : _DayMode.fixed,
+                },
+                onSelectionChanged: (s) => setState(() {
+                  _useBusinessDay = s.first == _DayMode.businessDay;
+                  _preferredDay ??= _expectedDate.day;
+                }),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: _preferredDay ?? _expectedDate.day,
+                decoration: InputDecoration(
+                  labelText: _useBusinessDay ? 'Qual dia útil' : 'Dia do mês',
+                  prefixIcon: Icon(
+                    _useBusinessDay
+                        ? Icons.work_outline
+                        : Icons.calendar_today_outlined,
+                  ),
+                ),
+                items: [
+                  for (var d = 1; d <= (_useBusinessDay ? 10 : 31); d++)
+                    DropdownMenuItem<int>(
+                      value: d,
+                      child: Text(_useBusinessDay ? '$dº dia útil' : 'Dia $d'),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _preferredDay = v),
+              ),
+              if (!_useBusinessDay) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Se o dia cair em fim de semana, o recebimento vai para o '
+                  'primeiro dia útil seguinte.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 10),
+              _dayPreview(Theme.of(context).textTheme),
+            ],
           ],
           const SizedBox(height: 10),
           TextField(
@@ -156,7 +222,10 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Text('Salvar receita'),
           ),
         ],
@@ -164,11 +233,61 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
     );
   }
 
-  Widget _label(String s) => Text(s,
-      style: Theme.of(context)
-          .textTheme
-          .titleSmall
-          ?.copyWith(fontWeight: FontWeight.w700));
+  Widget _label(String s) => Text(
+    s,
+    style: Theme.of(
+      context,
+    ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+  );
+
+  bool get _showsDaySelector =>
+      _freq != RecurrenceFrequency.weekly &&
+      _freq != RecurrenceFrequency.biweekly &&
+      _freq != RecurrenceFrequency.custom;
+
+  DateTime _resolvedStart() {
+    if (!_showsDaySelector) return _expectedDate;
+    final day = _preferredDay ?? _expectedDate.day;
+    if (_useBusinessDay) {
+      return DateHelpers.nextNthBusinessDay(day, from: _expectedDate) ??
+          _expectedDate;
+    }
+    return DateHelpers.nextBusinessDayOnOrAfter(
+      DateHelpers.nextFixedDay(day, from: _expectedDate),
+    );
+  }
+
+  Widget _dayPreview(TextTheme t) {
+    final next = _resolvedStart();
+    final label = _useBusinessDay
+        ? '${DateHelpers.weekdayName(next)}, ${DateHelpers.fullDate.format(next)} '
+              '(${_preferredDay ?? _expectedDate.day}º dia útil)'
+        : '${DateHelpers.weekdayName(next)}, ${DateHelpers.fullDate.format(next)}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.event_available, color: AppColors.info, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Próximo: $label',
+              style: t.bodySmall?.copyWith(
+                color: AppColors.info,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _save() async {
     final cents = parseMoney(_amount);
@@ -201,8 +320,9 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
             notes: _notes.text.trim(),
             paidAt: _received ? (_receivedDate ?? _expectedDate) : null,
             clearPaidAt: !_received,
-            incomeStatus:
-                _received ? IncomeStatus.received : IncomeStatus.expected,
+            incomeStatus: _received
+                ? IncomeStatus.received
+                : IncomeStatus.expected,
             updatedAt: DateTime.now(),
           ),
         );
@@ -218,33 +338,46 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
         );
       }
       if (_recurring) {
-        await c.saveRecurring(RecurringRule(
-          id: c.repo.newId(),
-          userId: c.user!.id,
-          description: _description.text.trim(),
-          type: TransactionType.income,
-          amountCents: cents,
-          accountId: _accountId,
-          categoryId: _categoryId,
-          frequency: _freq,
-          startDate: _expectedDate,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
+        await c.saveRecurring(
+          RecurringRule(
+            id: c.repo.newId(),
+            userId: c.user!.id,
+            description: _description.text.trim(),
+            type: TransactionType.income,
+            amountCents: cents,
+            accountId: _accountId,
+            categoryId: _categoryId,
+            frequency: _freq,
+            startDate: _resolvedStart(),
+            preferredDayOfMonth: _showsDaySelector
+                ? (_preferredDay ?? _expectedDate.day)
+                : null,
+            useBusinessDay: _showsDaySelector && _useBusinessDay,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
       }
       if (mounted) {
-        showToast(context,
-            widget.editing == null ? 'Receita registrada.' : 'Alterações salvas.');
+        showToast(
+          context,
+          widget.editing == null ? 'Receita registrada.' : 'Alterações salvas.',
+        );
         Navigator.pop(context);
       }
     } catch (_) {
       if (mounted) {
-        showToast(context,
-            'Não conseguimos salvar essa movimentação. Seus dados não foram alterados. Tente novamente.',
-            error: true);
+        showToast(
+          context,
+          'Não conseguimos salvar essa movimentação. Seus dados não foram alterados. Tente novamente.',
+          error: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 }
+
+/// Forma de recorrência mensal: dia fixo do mês ou N-ésimo dia útil.
+enum _DayMode { fixed, businessDay }

@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:ifinance/core/db/collection.dart';
 import 'package:ifinance/core/db/hive_db.dart';
 import 'package:ifinance/core/finance/finance_engine.dart';
+import 'package:ifinance/core/finance/recurrence_materializer.dart';
 import 'package:ifinance/core/models/models.dart';
 import 'package:ifinance/core/services/backup_service.dart';
 import 'package:ifinance/core/utils/date_helpers.dart';
@@ -523,6 +524,89 @@ void main() {
       expect(DateHelpers.isBusinessDay(d), isTrue);
       expect(d.isBefore(DateHelpers.dateOnly(from)), isFalse);
       expect(d.day, 6); // 5º dia útil de março/2026
+    });
+
+    test('nextBusinessDayOnOrAfter rola fim de semana para o 1º dia útil', () {
+      // 2026-03-07 é sábado → deve ir para 2026-03-09 (segunda).
+      final sat = DateHelpers.nextBusinessDayOnOrAfter(DateTime(2026, 3, 7));
+      expect(sat.weekday, DateTime.monday);
+      expect(sat.day, 9);
+      // Um dia útil permanece inalterado.
+      final mon = DateHelpers.nextBusinessDayOnOrAfter(DateTime(2026, 3, 9));
+      expect(mon.day, 9);
+    });
+
+    test('businessDayAdjusted move o dia fixo que cai em fim de semana', () {
+      // Dia 7 de março/2026 é sábado → ajusta para segunda, dia 9.
+      final adj = DateHelpers.businessDayAdjusted(2026, 3, 7);
+      expect(adj.day, 9);
+      expect(DateHelpers.isBusinessDay(adj), isTrue);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Recorrências com dia fixo / N-ésimo dia útil — cap. 22/51
+  // ---------------------------------------------------------------------------
+  group('RecurrenceMaterializer — dia fixo e dia útil', () {
+    RecurringRule rule({int? day, bool businessDay = false, DateTime? start}) =>
+        RecurringRule(
+          id: 'r1',
+          userId: uid,
+          description: 'Salário',
+          type: TransactionType.income,
+          amountCents: 500000,
+          frequency: RecurrenceFrequency.monthly,
+          startDate: start ?? DateTime(2026, 3, 1),
+          preferredDayOfMonth: day,
+          useBusinessDay: businessDay,
+          createdAt: DateTime(2026, 3, 1),
+          updatedAt: DateTime(2026, 3, 1),
+        );
+
+    test(
+      'dia útil: ocorrências caem no N-ésimo dia útil e nunca em fim de semana',
+      () {
+        // Regra com 5º dia útil; o startDate já é a data resolvida (06/03/2026).
+        final occ = RecurrenceMaterializer.occurrencesInWindow(
+          rule(day: 5, businessDay: true, start: DateTime(2026, 3, 6)),
+          DateTime(2026, 3, 1),
+          DateTime(2026, 5, 31),
+        );
+        expect(occ.isNotEmpty, isTrue);
+        for (final d in occ) {
+          expect(
+            DateHelpers.isBusinessDay(d),
+            isTrue,
+            reason: '$d não é dia útil',
+          );
+        }
+        expect(occ.first.day, 6); // 5º dia útil de março/2026
+      },
+    );
+
+    test('dia fixo: ocorrências mensais respeitam o dia', () {
+      final occ = RecurrenceMaterializer.occurrencesInWindow(
+        rule(day: 15, start: DateTime(2026, 4, 15)),
+        DateTime(2026, 4, 1),
+        DateTime(2026, 6, 30),
+      );
+      expect(occ.length, greaterThanOrEqualTo(3));
+      expect(occ[0].day, 15);
+      expect(occ[1].month, 5);
+      expect(occ[1].day, 15);
+    });
+
+    test('dia fixo em fim de semana rola para o 1º dia útil seguinte', () {
+      // Dia 7 → 07/06/2026 é domingo, deve rolar para 08/06 (segunda).
+      final occ = RecurrenceMaterializer.occurrencesInWindow(
+        rule(day: 7, start: DateTime(2026, 5, 7)),
+        DateTime(2026, 5, 1),
+        DateTime(2026, 6, 30),
+      );
+      expect(occ.length, 2);
+      expect(occ[1].month, 6);
+      expect(occ[1].day, 8);
+      expect(DateHelpers.isBusinessDay(occ[1]), isTrue);
     });
   });
 }

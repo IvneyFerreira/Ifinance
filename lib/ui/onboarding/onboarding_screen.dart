@@ -550,8 +550,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _formatPreview(_ReceiveMode mode, int fixedDay, int businessDay) {
     if (mode == _ReceiveMode.fixed) {
       final next = DateHelpers.nextFixedDay(fixedDay);
-      return 'Próximo: ${DateHelpers.fullDate.format(next)} '
-          '(dia $fixedDay).';
+      final adjusted = DateHelpers.nextBusinessDayOnOrAfter(next);
+      final moved = !DateHelpers.isSameDay(next, adjusted);
+      return 'Próximo: ${DateHelpers.fullDate.format(adjusted)} '
+          '(${DateHelpers.weekdayName(adjusted)})'
+          '${moved ? ' — o dia $fixedDay caiu em fim de semana, ajustado para o 1º dia útil.' : ' (dia $fixedDay).'}';
     }
     final next = DateHelpers.nextNthBusinessDay(businessDay);
     if (next == null) {
@@ -644,11 +647,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     int businessDay,
   ) {
     if (mode == _ReceiveMode.fixed) {
-      final next = DateHelpers.nextFixedDay(fixedDay);
-      return _ReceiveDate(fixedDay.clamp(1, 31), next);
+      // Dia fixo: se cair em fim de semana, vai para o 1º dia útil seguinte.
+      final next = DateHelpers.nextBusinessDayOnOrAfter(
+        DateHelpers.nextFixedDay(fixedDay),
+      );
+      return _ReceiveDate(fixedDay.clamp(1, 31), next, false);
     }
     final next = DateHelpers.nextNthBusinessDay(businessDay) ?? DateTime.now();
-    return _ReceiveDate(next.day, next);
+    return _ReceiveDate(next.day, next, true);
   }
 
   Future<void> _persistStep(int step) async {
@@ -714,6 +720,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               categoryId: cat,
               startDate: rec.start,
               preferredDayOfMonth: rec.day,
+              useBusinessDay: rec.businessDay,
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
             ),
@@ -747,6 +754,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               categoryId: cat,
               startDate: rec.start,
               preferredDayOfMonth: rec.day,
+              useBusinessDay: rec.businessDay,
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
             ),
@@ -823,9 +831,11 @@ extension _FirstOrNull<T> on Iterable<T> {
 enum _ReceiveMode { fixed, businessDay }
 
 /// Data resolvida para uma recorrência: [day] = dia do mês a gravar em
-/// `preferredDayOfMonth`; [start] = próxima ocorrência (data inicial da regra).
+/// `preferredDayOfMonth`; [start] = próxima ocorrência (data inicial da regra);
+/// [businessDay] = `true` se o dia é um "N-ésimo dia útil".
 class _ReceiveDate {
   final int day;
   final DateTime start;
-  const _ReceiveDate(this.day, this.start);
+  final bool businessDay;
+  const _ReceiveDate(this.day, this.start, this.businessDay);
 }

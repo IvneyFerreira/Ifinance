@@ -61,21 +61,19 @@ class RecurringScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(r.description,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.w700)),
                                 Text(
-                                  '${Labels.frequency(r.frequency)}${r.preferredDayOfMonth != null ? ' • dia ${r.preferredDayOfMonth}' : ''} • ${DateHelpers.dayMonth.format(r.startDate)}',
+                                  r.description,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                Text(
+                                  _subtitle(r),
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                                 if (r.creditCardId != null)
                                   Text(
                                     'Cartão',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(color: AppColors.info),
                                   ),
                               ],
@@ -84,10 +82,12 @@ class RecurringScreen extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              MoneyDisplay(r.amountCents,
-                                  fontSize: 15,
-                                  colorize: true,
-                                  signed: r.type == TransactionType.income),
+                              MoneyDisplay(
+                                r.amountCents,
+                                fontSize: 15,
+                                colorize: true,
+                                signed: r.type == TransactionType.income,
+                              ),
                               Switch(
                                 value: r.active,
                                 onChanged: (_) => c.toggleRecurring(r),
@@ -106,10 +106,21 @@ class RecurringScreen extends StatelessWidget {
   void _openForm(BuildContext context, {RecurringRule? rule}) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => RecurringFormScreen(editing: rule),
-      ),
+      MaterialPageRoute(builder: (_) => RecurringFormScreen(editing: rule)),
     );
+  }
+
+  /// Linha de detalhe: frequência + dia (fixo, "5º dia útil", ou mesmo dia
+  /// da data) + próxima ocorrência.
+  String _subtitle(RecurringRule r) {
+    String dayPart = '';
+    if (r.preferredDayOfMonth != null) {
+      dayPart = r.useBusinessDay
+          ? ' • ${r.preferredDayOfMonth}º dia útil'
+          : ' • dia ${r.preferredDayOfMonth}';
+    }
+    return '${Labels.frequency(r.frequency)}$dayPart'
+        ' • próxima ${DateHelpers.dayMonth.format(r.startDate)}';
   }
 }
 
@@ -134,10 +145,12 @@ class SubscriptionsScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
               children: [
                 FinancialCard(
-                  gradient: LinearGradient(colors: [
-                    AppColors.emerald.withValues(alpha: 0.14),
-                    AppColors.emerald.withValues(alpha: 0.03),
-                  ]),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.emerald.withValues(alpha: 0.14),
+                      AppColors.emerald.withValues(alpha: 0.03),
+                    ],
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -165,19 +178,20 @@ class SubscriptionsScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           const CircleIcon(
-                              icon: Icons.autorenew,
-                              color: AppColors.info,
-                              size: 40),
+                            icon: Icons.autorenew,
+                            color: AppColors.info,
+                            size: 40,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(fontWeight: FontWeight.w700)),
+                                Text(
+                                  s.name,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
                                 Text(
                                   'Próxima: ${DateHelpers.dayMonth.format(s.nextChargeDate)}',
                                   style: Theme.of(context).textTheme.bodySmall,
@@ -202,8 +216,10 @@ class SubscriptionsScreen extends StatelessWidget {
       children: [
         Text(label, style: t.bodySmall),
         const SizedBox(height: 4),
-        Text(value,
-            style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+        Text(
+          value,
+          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
       ],
     );
   }

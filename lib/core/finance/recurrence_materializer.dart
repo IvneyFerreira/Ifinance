@@ -54,27 +54,71 @@ class RecurrenceMaterializer {
       case RecurrenceFrequency.biweekly:
         return DateHelpers.addDays(current, 14);
       case RecurrenceFrequency.monthly:
-        return _addMonthKeepDay(current, 1, rule.preferredDayOfMonth);
+        return _addMonthKeepDay(
+          current,
+          1,
+          rule.preferredDayOfMonth,
+          rule.useBusinessDay,
+        );
       case RecurrenceFrequency.bimonthly:
-        return _addMonthKeepDay(current, 2, rule.preferredDayOfMonth);
+        return _addMonthKeepDay(
+          current,
+          2,
+          rule.preferredDayOfMonth,
+          rule.useBusinessDay,
+        );
       case RecurrenceFrequency.quarterly:
-        return _addMonthKeepDay(current, 3, rule.preferredDayOfMonth);
+        return _addMonthKeepDay(
+          current,
+          3,
+          rule.preferredDayOfMonth,
+          rule.useBusinessDay,
+        );
       case RecurrenceFrequency.semiannual:
-        return _addMonthKeepDay(current, 6, rule.preferredDayOfMonth);
+        return _addMonthKeepDay(
+          current,
+          6,
+          rule.preferredDayOfMonth,
+          rule.useBusinessDay,
+        );
       case RecurrenceFrequency.annual:
-        return _addMonthKeepDay(current, 12, rule.preferredDayOfMonth);
+        return _addMonthKeepDay(
+          current,
+          12,
+          rule.preferredDayOfMonth,
+          rule.useBusinessDay,
+        );
       case RecurrenceFrequency.custom:
         return DateHelpers.addDays(
-            current, rule.customIntervalDays.clamp(1, 366));
+          current,
+          rule.customIntervalDays.clamp(1, 366),
+        );
     }
   }
 
+  /// Calcula a ocorrência do mês seguinte (mensal+).
+  ///
+  /// - [useBusinessDay] = true → [preferredDay] é o **N-ésimo dia útil** do mês
+  ///   (ex.: 5º dia útil, comum em salários).
+  /// - [useBusinessDay] = false → [preferredDay] é um **dia fixo**; se cair em
+  ///   fim de semana, é movido para o primeiro dia útil seguinte.
   static DateTime _addMonthKeepDay(
-      DateTime current, int months, int? preferredDay) {
+    DateTime current,
+    int months,
+    int? preferredDay,
+    bool useBusinessDay,
+  ) {
     final base = DateHelpers.addMonths(current, months);
     if (preferredDay == null) return base;
     final day = preferredDay.clamp(
-        1, DateHelpers.daysInMonth(base.year, base.month));
-    return DateTime(base.year, base.month, day);
+      1,
+      DateHelpers.daysInMonth(base.year, base.month),
+    );
+    if (useBusinessDay) {
+      final nth = DateHelpers.nthBusinessDay(base.year, base.month, day);
+      if (nth != null) return nth;
+    }
+    // Dia fixo: rola para o primeiro dia útil se cair em fim de semana.
+    return DateHelpers.businessDayAdjusted(base.year, base.month, day);
   }
 }
