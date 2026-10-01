@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
+import '../../core/utils/money.dart';
 import '../../core/widgets/components.dart';
 import '../../state/app_controller.dart';
 import '../forms/expense_form.dart';
@@ -235,7 +236,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   /// Seção de previsões (ocorrências futuras de recorrências).
   Widget _forecastSection(BuildContext context, List<_Forecast> items) {
     final t = Theme.of(context).textTheme;
-    final total = items.fold<int>(0, (s, f) => s + f.amountCents);
+    final inflows = items
+        .where((f) => f.isIncome)
+        .fold<int>(0, (s, f) => s + f.amountCents);
+    final outflows = items
+        .where((f) => !f.isIncome)
+        .fold<int>(0, (s, f) => s + f.amountCents);
+    final net = inflows + outflows;
     return Padding(
       padding: const EdgeInsets.only(top: 22),
       child: Column(
@@ -251,7 +258,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              MoneyDisplay(total, fontSize: 12, colorize: true, signed: true),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Ocultar previsões',
@@ -263,6 +269,40 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           Text(
             'Valores ainda não lançados, gerados pelas suas recorrências.',
             style: t.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          // Entradas e saídas em SEPARADO — evita que um total "líquido"
+          // (entradas − saídas) seja lido como "valor a receber".
+          Row(
+            children: [
+              Expanded(
+                child: _forecastMetric(
+                  context,
+                  'A receber',
+                  inflows,
+                  AppColors.positive,
+                  Icons.arrow_downward,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _forecastMetric(
+                  context,
+                  'A pagar',
+                  outflows,
+                  AppColors.negativeSoft,
+                  Icons.arrow_upward,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Saldo previsto: ${Money.format(net)}',
+              style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(height: 10),
           FinancialCard(
@@ -309,6 +349,38 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Métrica compacta de totais (receber/pagar) das previsões.
+  Widget _forecastMetric(
+    BuildContext context,
+    String label,
+    int cents,
+    Color color,
+    IconData icon,
+  ) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: t.bodySmall),
+            ],
+          ),
+          const SizedBox(height: 4),
+          MoneyDisplay(cents.abs(), fontSize: 15, color: color),
         ],
       ),
     );

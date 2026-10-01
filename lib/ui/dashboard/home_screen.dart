@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Text(
-                'Seu dinheiro hoje',
+                _horizonTitle,
                 style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const Spacer(),
@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w800,
           ),
           Text(
-            'Livre seguro',
+            _safeLabel,
             style: t.bodySmall?.copyWith(color: t.bodySmall?.color),
           ),
           const SizedBox(height: 20),
@@ -217,10 +217,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: _miniMetric(
                   context,
-                  'Comprometido',
-                  d.committedCents,
-                  Icons.lock_clock,
-                  color: AppColors.warning,
+                  d.expectedIncomeCents > 0 ? 'A receber' : 'Comprometido',
+                  d.expectedIncomeCents > 0
+                      ? d.expectedIncomeCents
+                      : d.committedCents,
+                  d.expectedIncomeCents > 0
+                      ? Icons.arrow_downward
+                      : Icons.lock_clock,
+                  color: d.expectedIncomeCents > 0
+                      ? AppColors.positive
+                      : AppColors.warning,
                   onTap: () => showCalcExplanation(
                     context,
                     engine.explainSafeAvailable(until: _horizonEnd(engine)),
@@ -229,7 +235,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          _miniMetric(
+            context,
+            'Comprometido no período',
+            d.committedCents,
+            Icons.lock_clock,
+            color: AppColors.warning,
+            onTap: () => showCalcExplanation(
+              context,
+              engine.explainSafeAvailable(until: _horizonEnd(engine)),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Icon(
@@ -250,6 +268,20 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  /// Cabeçalho do cartão principal, coerente com o horizonte escolhido.
+  String get _horizonTitle => switch (_horizon) {
+        Horizon.today => 'Seu dinheiro hoje',
+        Horizon.nextIncome => 'Até o próximo recebimento',
+        Horizon.month => 'Seu dinheiro no mês',
+      };
+
+  /// Rótulo do valor principal conforme o horizonte.
+  String get _safeLabel => switch (_horizon) {
+        Horizon.today => 'Livre seguro hoje',
+        Horizon.nextIncome => 'Livre seguro até receber',
+        Horizon.month => 'Livre seguro no mês',
+      };
 
   DateTime _horizonEnd(FinanceEngine e) => e.horizonEndDate(_horizon);
 

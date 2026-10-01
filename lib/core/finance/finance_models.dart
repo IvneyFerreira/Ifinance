@@ -161,6 +161,7 @@ class DashboardData {
   final Horizon horizon;
   final int currentBalanceCents;
   final int committedCents;
+  final int expectedIncomeCents;
   final int safeAvailableCents;
   final int projectedMonthEndCents;
   final MonthlySummary monthSummary;
@@ -172,6 +173,7 @@ class DashboardData {
     required this.horizon,
     required this.currentBalanceCents,
     required this.committedCents,
+    this.expectedIncomeCents = 0,
     required this.safeAvailableCents,
     required this.projectedMonthEndCents,
     required this.monthSummary,

@@ -188,6 +188,40 @@ class FinanceEngine {
   // 64. COMPROMETIDO (depende do horizonte)
   // ---------------------------------------------------------------------------
 
+  /// Entradas esperadas até [until]: receitas lançadas ainda não recebidas +
+  /// receitas recorrentes previstas. Espelha [getCommittedAmount] para que o
+  /// "dinheiro hoje" nunca penalize apenas as saídas (cap. 65).
+  ///
+  /// Só conta o que ainda NÃO entrou no saldo atual (paidAt == null) e não é
+  /// transferência. As recorrentes futuras já respeitam a deduplicação.
+  int getExpectedIncomeAmount({required DateTime until}) {
+    final today = DateHelpers.dateOnly(DateTime.now());
+    final untilD = DateHelpers.dateOnly(until);
+    var expected = 0;
+
+    // Receitas em contas ainda não recebidas, com data até `until`.
+    for (final t in transactions) {
+      if (!t.isIncome || t.isTransfer) continue;
+      if (t.paidAt != null) continue; // já entrou no saldo
+      if (t.incomeStatus == IncomeStatus.cancelled) continue;
+      final d = DateHelpers.dateOnly(t.dueDate);
+      if (!d.isAfter(untilD)) expected += t.amountCents;
+    }
+
+    // Receitas recorrentes previstas (a partir de hoje) dentro do horizonte.
+    if (!today.isAfter(untilD)) {
+      for (final rule in recurringRules) {
+        if (rule.type != TransactionType.income) continue;
+        for (final occ in RecurrenceMaterializer.occurrencesInWindow(
+            rule, today, untilD)) {
+          if (_isOccurrenceRealized(rule, occ)) continue;
+          expected += rule.amountCents;
+        }
+      }
+    }
+    return expected;
+  }
+
   /// Obrigações (saídas esperadas) até [until], considerando faturas, despesas
   /// previstas/pendentes, parcelas do cartão e recorrências futuras.
   /// Transferências não comprometem o resultado consolidado (cap. 17).
@@ -232,19 +266,24 @@ class FinanceEngine {
   // 65. SALDO LIVRE SEGURO
   // ---------------------------------------------------------------------------
 
-  /// Saldo disponível − compromissos do horizonte − reservas protegidas −
-  /// margem de segurança. Receitas futuras NÃO são tratadas como dinheiro
-  /// disponível hoje (cap. 65).
+  /// Saldo disponível + receitas previstas no horizonte − compromissos do
+  /// horizonte − reservas protegidas − margem de segurança (cap. 65).
   ///
-  /// A margem é aplicada sobre o valor que SOBRA depois de pagar os
-  /// compromissos (denominado "disponível livre"), e não sobre o saldo bruto —
-  /// assim, quem já pagou todas as contas pode gastar o que sobra, guardando
-  /// apenas a margem sobre esse restante.
+  /// IMPORTANTE: as entradas previstas dentro do horizonte SÃO consideradas,
+  /// pois o horizonte ("Mês"/"Próximo recebimento") inclui o dia do salário.
+  /// Sem isso, o indicador conta só as saídas do mês e ignora o salário que
+  /// cai no mesmo período — produzindo um "Livre seguro" irrealmente negativo
+  /// (antes do dia de pagamento). Só entram valores AINDA não recebidos; os já
+  /// recebidos já estão no saldo atual (sem contagem em dobro).
+  ///
+  /// A margem é aplicada sobre o valor que SOBRA depois de quitar os
+  /// compromissos ("disponível livre"), e não sobre o saldo bruto.
   int getSafeAvailableBalance({required DateTime until}) {
     final available = getCurrentBalance();
+    final expected = getExpectedIncomeAmount(until: until);
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final free = available - committed - reserves;
+    final free = available + expected - committed - reserves;
     final margin = Money.applyPercent(free, settings.safetyMarginPercent);
     final safe = free - margin;
     return safe;
@@ -253,24 +292,28 @@ class FinanceEngine {
   /// Valor da margem de segurança aplicada (sobre o disponível livre).
   int safetyMarginValue({required DateTime until}) {
     final available = getCurrentBalance();
+    final expected = getExpectedIncomeAmount(until: until);
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final free = available - committed - reserves;
+    final free = available + expected - committed - reserves;
     return Money.applyPercent(free, settings.safetyMarginPercent);
   }
 
   /// Explicação detalhada do saldo livre (cap. 39).
   CalcExplanation explainSafeAvailable({required DateTime until}) {
     final available = getCurrentBalance();
+    final expected = getExpectedIncomeAmount(until: until);
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final free = available - committed - reserves;
+    final free = available + expected - committed - reserves;
     final margin = Money.applyPercent(free, settings.safetyMarginPercent);
     final result = free - margin;
     return CalcExplanation(
       title: 'Saldo livre seguro',
       components: [
         CalcComponent('Saldo em contas', available),
+        if (expected > 0)
+          CalcComponent('Receitas previstas até o horizonte', expected),
         CalcComponent('Compromissos considerados', committed,
             isSubtraction: true),
         if (reserves > 0)
@@ -721,12 +764,14 @@ class FinanceEngine {
     final next = getNextIncome();
     final until = next?.date ?? DateHelpers.endOfMonth(DateTime.now());
     final available = getCurrentBalance();
+    final expected = getExpectedIncomeAmount(until: until);
     final committed = getCommittedAmount(until: until);
     final reserves = settings.protectedReserveCents;
-    final free = available - committed - reserves;
+    final free = available + expected - committed - reserves;
     final margin = Money.applyPercent(free, settings.safetyMarginPercent);
     return {
       'available': available,
+      'expectedIncome': expected,
       'committed': committed,
       'margin': margin,
       'reserves': reserves,
@@ -831,6 +876,7 @@ class FinanceEngine {
   DashboardData buildDashboard(Horizon horizon) {
     final until = horizonEndDate(horizon);
     final available = getCurrentBalance();
+    final expected = getExpectedIncomeAmount(until: until);
     final committed = getCommittedAmount(until: until);
     final safe = getSafeAvailableBalance(until: until);
     final lowest = getLowestProjectedBalance(until: until);
@@ -840,6 +886,7 @@ class FinanceEngine {
       horizon: horizon,
       currentBalanceCents: available,
       committedCents: committed,
+      expectedIncomeCents: expected,
       safeAvailableCents: safe,
       projectedMonthEndCents: getProjectedBalance(monthEnd),
       monthSummary: getMonthlySummary(),

@@ -185,7 +185,11 @@ def _build_context_prompt(context: dict) -> str:
     lines.append(f"- Taxa de poupança: {month.get('savingsRate', '-')}")
     lines.append(f"- Comprometido até o fim do mês: {month.get('committed', 'R$ 0,00')}")
     lines.append(f"- Saldo disponível hoje: {context.get('available', 'R$ 0,00')}")
-    lines.append(f"- Livre para gastar com segurança: {context.get('safeToSpend', 'R$ 0,00')}")
+    lines.append(
+        f"- Livre para gastar com segurança: {context.get('safeToSpend', 'R$ 0,00')} "
+        f"(já desconta compromissos, reservas e margem, e considera as receitas "
+        f"previstas até o próximo recebimento)"
+    )
     lines.append(f"- Próximo recebimento: {context.get('nextIncome', 'sem previsão')}")
 
     cats = _as_list(context.get("topCategories"))

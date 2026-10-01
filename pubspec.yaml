@@ -2,7 +2,7 @@ name: ifinance
 description: "IFinance — Controle financeiro na palma da sua mão. By Ivoney Ferreira."
 publish_to: 'none'
 
-version: 1.0.10+11
+version: 1.0.11+12
 
 environment:
   sdk: ^3.9.2
