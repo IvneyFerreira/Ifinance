@@ -474,6 +474,93 @@ class FinanceEngine {
     );
   }
 
+  /// Panorama do mês (cap. 9/28): separa o que JÁ entrou/saiu do que AINDA
+  /// falta pagar/receber, conta as contas em aberto e calcula o valor que
+  /// sobra para gastar com segurança no mês. É a base da visão mensal de
+  /// Movimentações, para o usuário enxergar "como está o meu mês".
+  MonthOverview monthOverview({DateTime? month}) {
+    final ref = month ?? DateTime.now();
+    final start = DateHelpers.startOfMonth(ref);
+    final end = DateHelpers.endOfMonth(ref);
+    final today = DateHelpers.dateOnly(DateTime.now());
+    final lastDay = today.isBefore(start)
+        ? start
+        : (today.isAfter(end) ? end : today);
+
+    var incomePaid = 0;
+    var incomePending = 0;
+    var expensePaid = 0;
+    var expensePending = 0;
+    var pendingBills = 0;
+    var paidBills = 0;
+
+    for (final t in transactions) {
+      if (t.isTransfer) continue;
+      if (t.isIncome && t.incomeStatus == IncomeStatus.cancelled) continue;
+      if (t.isExpense && t.expenseStatus == ExpenseStatus.cancelled) continue;
+      final comp = DateHelpers.dateOnly(t.competenceDate);
+      final due = DateHelpers.dateOnly(t.dueDate);
+      final inMonthComp = !comp.isBefore(start) && !comp.isAfter(end);
+      final inMonthDue = !due.isBefore(start) && !due.isAfter(end);
+
+      if (t.isIncome) {
+        if (!inMonthComp) continue;
+        if (t.paidAt != null) {
+          incomePaid += t.amountCents;
+        } else {
+          incomePending += t.amountCents;
+        }
+      } else if (t.creditCardId == null && !t.isInvoicePayment) {
+        // Despesa em conta (não cartão) — é uma "conta" a pagar.
+        if (!inMonthComp) continue;
+        if (t.paidAt != null) {
+          expensePaid += t.amountCents;
+          paidBills++;
+        } else {
+          expensePending += t.amountCents;
+          pendingBills++;
+        }
+      } else if (t.isInvoicePayment) {
+        // Pagamento de fatura é caixa; conta no "saiu" do mês, sem virar conta.
+        if (inMonthDue && t.paidAt != null) expensePaid += t.amountCents;
+      }
+    }
+
+    // Faturas de cartão em aberto com vencimento no mês = contas a pagar.
+    for (final inv in _invoicesWithTotals()) {
+      if (inv.paidAt != null) continue;
+      final due = DateHelpers.dateOnly(inv.dueDate);
+      if (due.isBefore(start) || due.isAfter(end)) continue;
+      expensePending += inv.totalCents;
+      pendingBills++;
+    }
+
+    // Recorrências do mês ainda não lançadas (dedup evita contagem em dobro).
+    for (final rule in recurringRules) {
+      for (final occ in RecurrenceMaterializer.occurrencesInWindow(
+          rule, start, end)) {
+        if (_isOccurrenceRealized(rule, occ)) continue;
+        if (rule.type == TransactionType.income) {
+          incomePending += rule.amountCents;
+        } else {
+          expensePending += rule.amountCents;
+          if (!occ.isBefore(lastDay)) pendingBills++;
+        }
+      }
+    }
+
+    return MonthOverview(
+      month: start,
+      incomePaidCents: incomePaid,
+      incomePendingCents: incomePending,
+      expensePaidCents: expensePaid,
+      expensePendingCents: expensePending,
+      pendingBillsCount: pendingBills,
+      paidBillsCount: paidBills,
+      safeToSpendCents: getSafeAvailableBalance(until: end),
+    );
+  }
+
   /// 10. Fluxo mensal (Receitas x Despesas) para gráfico.
   List<FlowPoint> getFlow({int months = 6, DateTime? end}) {
     final endMonth = end ?? DateTime.now();

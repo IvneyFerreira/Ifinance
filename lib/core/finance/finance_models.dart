@@ -156,6 +156,56 @@ class NetWorth {
   });
 }
 
+/// Panorama de um mês (cap. 9): quanto já entrou/saiu, quanto ainda falta
+/// pagar/receber e quanto sobra para gastar com segurança. Base da visão
+/// mensal de Movimentações — o usuário enxerga "como está o meu mês".
+class MonthOverview {
+  final DateTime month;
+
+  /// Receitas já recebidas no mês.
+  final int incomePaidCents;
+
+  /// Receitas ainda a receber no mês (lançadas + recorrentes previstas).
+  final int incomePendingCents;
+
+  /// Despesas já pagas no mês.
+  final int expensePaidCents;
+
+  /// Despesas ainda a pagar no mês (lançadas + recorrentes + faturas).
+  final int expensePendingCents;
+
+  /// Quantidade de contas (despesas) ainda em aberto no mês.
+  final int pendingBillsCount;
+
+  /// Quantidade de contas (despesas) já quitadas no mês.
+  final int paidBillsCount;
+
+  /// Quanto o usuário ainda pode gastar com segurança no mês (já descontando
+  /// as contas do mês, reservas protegidas e a margem de segurança).
+  final int safeToSpendCents;
+
+  const MonthOverview({
+    required this.month,
+    required this.incomePaidCents,
+    required this.incomePendingCents,
+    required this.expensePaidCents,
+    required this.expensePendingCents,
+    required this.pendingBillsCount,
+    required this.paidBillsCount,
+    required this.safeToSpendCents,
+  });
+
+  int get incomeTotalCents => incomePaidCents + incomePendingCents;
+  int get expenseTotalCents => expensePaidCents + expensePendingCents;
+  int get resultCents => incomeTotalCents - expenseTotalCents;
+
+  /// `true` quando não há contas em aberto neste mês.
+  bool get allBillsPaid => pendingBillsCount == 0;
+
+  /// `true` quando existe pelo menos uma conta lançada no mês (paga ou não).
+  bool get hasBills => pendingBillsCount > 0 || paidBillsCount > 0;
+}
+
 /// Retrato consolidado do dashboard (evita dezenas de queries — cap. 74).
 class DashboardData {
   final Horizon horizon;

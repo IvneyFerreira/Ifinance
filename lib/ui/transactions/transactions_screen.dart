@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/finance/finance_models.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
@@ -31,11 +32,13 @@ class _Forecast {
   final int amountCents;
   final DateTime date;
   final bool isIncome;
+  final RecurringRule rule;
   const _Forecast({
     required this.label,
     required this.amountCents,
     required this.date,
     required this.isIncome,
+    required this.rule,
   });
 }
 
@@ -44,7 +47,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   _Filter _filter = _Filter.all;
   String? _categoryId;
   DateTimeRange? _range;
-  bool _showForecast = true;
+
+  /// Mês em exibição (1º dia). Por padrão, o mês atual — é um controle mensal.
+  late DateTime _month = DateHelpers.startOfMonth(DateTime.now());
+
+  /// Mostra as ocorrências futuras de recorrências (desligado por padrão para
+  /// não "poluir" a visão do mês).
+  bool _showForecast = false;
+
+  /// `true` quando o mês exibido é o mês corrente.
+  bool get _isCurrentMonth =>
+      DateHelpers.isSameMonth(_month, DateTime.now());
 
   @override
   void dispose() {
@@ -52,32 +65,44 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     super.dispose();
   }
 
-  /// Ocorrências futuras de recorrências ainda não lançadas (próximos 90 dias).
-  List<_Forecast> _forecasts(AppController c) {
+  /// Ocorrências futuras de recorrências ainda não lançadas até o fim de [month].
+  List<_Forecast> _forecasts(AppController c, DateTime month) {
     final today = DateHelpers.dateOnly(DateTime.now());
-    final until = DateHelpers.addDays(today, 90);
+    final monthEnd = DateHelpers.dateOnly(DateHelpers.endOfMonth(month));
+    // No mês atual parte de hoje; em meses passados/futuros cobre o mês inteiro.
+    final from = (_isCurrentMonth && today.isAfter(DateHelpers.startOfMonth(month)))
+        ? today
+        : DateHelpers.startOfMonth(month);
+    if (monthEnd.isBefore(from)) return const [];
     final ruleIds = c.recurringRules.map((r) => r.id).toSet();
+    final ruleById = {for (final r in c.recurringRules) r.id: r};
     final out = <_Forecast>[];
-    for (final e in c.engine.cashEvents(from: today, to: until)) {
+    for (final e in c.engine.cashEvents(from: from, to: monthEnd)) {
       if (e.confirmed) continue;
       if (!ruleIds.contains(e.sourceId)) continue;
+      final rule = ruleById[e.sourceId];
+      if (rule == null) continue;
       final isIncome = e.amountCents > 0;
       out.add(_Forecast(
         label: e.label.isEmpty ? (isIncome ? 'Receita' : 'Despesa') : e.label,
         amountCents: e.amountCents,
         date: e.date,
         isIncome: isIncome,
+        rule: rule,
       ));
     }
     out.sort((a, b) => a.date.compareTo(b.date));
     return out;
   }
 
+  /// Contas do mês ainda não quitadas (para o aviso "falta você pagar").
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<AppController>();
+    final overview = c.engine.monthOverview(month: _month);
     final list = _applyFilters(c.transactions);
-    final allForecasts = _showForecast ? _forecasts(c) : const <_Forecast>[];
+    final allForecasts = _showForecast ? _forecasts(c, _month) : const <_Forecast>[];
     // Respeita o filtro de tipo (receita/despesa) nas previsões.
     final forecasts = switch (_filter) {
       _Filter.income => allForecasts.where((f) => f.isIncome).toList(),
@@ -86,7 +111,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       _Filter.all => allForecasts,
     };
 
-    // Agrupa por dia
+    final isFiltering = _search.text.trim().isNotEmpty ||
+        _categoryId != null ||
+        _range != null ||
+        _filter != _Filter.all;
+
+    // Agrupa por dia (competência).
     final grouped = <DateTime, List<Transaction>>{};
     for (final t in list) {
       final key = DateHelpers.dateOnly(t.competenceDate);
@@ -130,100 +160,112 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               ),
             ),
           ),
+          _monthHeader(context),
           _filterChips(),
           const SizedBox(height: 6),
           Expanded(
-            child: (list.isEmpty && forecasts.isEmpty && c.recurringRules.isEmpty)
+            child: (!overview.hasBills &&
+                    list.isEmpty &&
+                    forecasts.isEmpty &&
+                    c.recurringRules.isEmpty)
                 ? const EmptyState(
                     icon: Icons.receipt_long_outlined,
                     title: 'Nenhuma movimentação',
                     message:
                         'Registre sua primeira despesa ou receita usando o botão +.',
                   )
-                : (list.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                        children: [
-                          const SizedBox(height: 40),
-                          const EmptyState(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'Nenhuma movimentação lançada',
-                            message: 'Veja abaixo as previsões das suas recorrências.',
-                          ),
-                          if (_showForecast && forecasts.isNotEmpty)
-                            _forecastSection(context, forecasts),
-                        ],
-                      )
-                    : ListView.builder(
+                : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                    itemCount: days.length +
-                        (_showForecast
-                            ? (forecasts.isNotEmpty ? 1 : 0)
-                            : (c.recurringRules.isNotEmpty ? 1 : 0)),
-                    itemBuilder: (_, i) {
-                      if (i == days.length) {
-                        return _showForecast
-                            ? _forecastSection(context, forecasts)
-                            : _forecastToggle(context);
-                      }
-                      final day = days[i];
-                      final items = grouped[day]!
-                        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-                      final dayTotal = items.fold<int>(
-                        0,
-                        (sum, t) =>
-                            sum + (t.isTransfer ? 0 : t.economicSignedCents),
-                      );
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _overviewCard(context, overview),
+                      const SizedBox(height: 18),
+                      Row(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 18, bottom: 8),
-                            child: Row(
-                              children: [
-                                Text(
-                                  _dayHeader(day),
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                const Spacer(),
-                                if (!items.every((t) => t.isTransfer))
-                                  MoneyDisplay(
-                                    dayTotal,
-                                    fontSize: 12,
-                                    colorize: true,
-                                    signed: true,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          FinancialCard(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 4,
-                            ),
-                            child: Column(
-                              children: [
-                                for (var j = 0; j < items.length; j++) ...[
-                                  TransactionTile(
-                                    transaction: items[j],
-                                    category: c.categoryById(
-                                      items[j].categoryId,
-                                    ),
-                                    account: c.accountById(items[j].accountId),
-                                    card: c.cardById(items[j].creditCardId),
-                                    onTap: () => _showDetail(items[j]),
-                                  ),
-                                  if (j != items.length - 1)
-                                    const Divider(height: 1),
-                                ],
-                              ],
-                            ),
+                          Text(
+                            isFiltering
+                                ? 'Resultados'
+                                : 'Lançamentos do mês',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ],
-                      );
-                    },
-                  )),
+                      ),
+                      if (days.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: EmptyState(
+                            icon: Icons.inbox_outlined,
+                            title: isFiltering
+                                ? 'Nada encontrado'
+                                : 'Nenhum lançamento neste mês',
+                            message: isFiltering
+                                ? 'Ajuste a busca ou os filtros.'
+                                : 'As contas previstas aparecem abaixo, quando houver.',
+                          ),
+                        )
+                      else
+                        for (final day in days)
+                          _dayGroup(context, c, day, grouped[day]!),
+                      if (forecasts.isNotEmpty)
+                        _forecastSection(context, forecasts)
+                      else if (!_showForecast && c.recurringRules.isNotEmpty)
+                        _forecastToggle(context),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Alterna o mês em exibição (controle mensal).
+  void _shiftMonth(int delta) {
+    setState(() {
+      _month =
+          DateHelpers.startOfMonth(DateHelpers.addMonths(_month, delta));
+      _range = null; // mês e período são exclusivos na visão
+    });
+  }
+
+  /// Cabeçalho com navegação entre meses.
+  Widget _monthHeader(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Mês anterior',
+            onPressed: () => _shiftMonth(-1),
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: _isCurrentMonth
+                  ? null
+                  : () => setState(() =>
+                      _month = DateHelpers.startOfMonth(DateTime.now())),
+              child: Column(
+                children: [
+                  Text(
+                    DateHelpers.monthLabel(_month, withYear: true),
+                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  if (!_isCurrentMonth)
+                    Text(
+                      'Voltar para hoje',
+                      style: t.bodySmall?.copyWith(color: AppColors.emerald),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Próximo mês',
+            onPressed: () => _shiftMonth(1),
+            icon: const Icon(Icons.chevron_right),
           ),
         ],
       ),
@@ -232,6 +274,238 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
   bool get _activeFilters =>
       _filter != _Filter.all || _categoryId != null || _range != null;
+
+  /// Grupo de lançamentos de um dia (com o total do dia).
+  Widget _dayGroup(
+    BuildContext context,
+    AppController c,
+    DateTime day,
+    List<Transaction> items,
+  ) {
+    items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final dayTotal = items.fold<int>(
+      0,
+      (sum, t) => sum + (t.isTransfer ? 0 : t.economicSignedCents),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 18, bottom: 8),
+          child: Row(
+            children: [
+              Text(
+                _dayHeader(day),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              if (!items.every((t) => t.isTransfer))
+                MoneyDisplay(
+                  dayTotal,
+                  fontSize: 12,
+                  colorize: true,
+                  signed: true,
+                ),
+            ],
+          ),
+        ),
+        FinancialCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Column(
+            children: [
+              for (var j = 0; j < items.length; j++) ...[
+                TransactionTile(
+                  transaction: items[j],
+                  category: c.categoryById(items[j].categoryId),
+                  account: c.accountById(items[j].accountId),
+                  card: c.cardById(items[j].creditCardId),
+                  onTap: () => _showDetail(items[j]),
+                ),
+                if (j != items.length - 1) const Divider(height: 1),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Cartão-resumo do mês: entrou/saiu, quanto sobra para gastar e o status
+  /// das contas ("falta você pagar" / "tudo quitado").
+  Widget _overviewCard(BuildContext context, MonthOverview o) {
+    final t = Theme.of(context).textTheme;
+    final allPaid = o.allBillsPaid;
+    return FinancialCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Resumo do mês',
+                style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const Spacer(),
+              StatusBadge(
+                label: _isCurrentMonth ? 'Este mês' : 'Fechado',
+                color: _isCurrentMonth ? AppColors.info : AppColors.gray400,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _overviewMetric(
+                  context,
+                  'Entrou',
+                  o.incomePaidCents,
+                  AppColors.positive,
+                  icon: Icons.arrow_downward,
+                  subtitle: o.incomePendingCents > 0
+                      ? 'a receber ${Money.format(o.incomePendingCents)}'
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _overviewMetric(
+                  context,
+                  'Saiu',
+                  o.expensePaidCents,
+                  AppColors.negativeSoft,
+                  icon: Icons.arrow_upward,
+                  subtitle: o.expensePendingCents > 0
+                      ? 'a pagar ${Money.format(o.expensePendingCents)}'
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (o.safeToSpendCents >= 0
+                      ? AppColors.emerald
+                      : AppColors.negative)
+                  .withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.savings_outlined,
+                  size: 20,
+                  color: o.safeToSpendCents >= 0
+                      ? AppColors.emerald
+                      : AppColors.negative,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pode gastar com segurança',
+                          style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(
+                        'livre após pagar as contas, reservas e a margem',
+                        style: t.bodySmall?.copyWith(fontSize: 10.5),
+                      ),
+                    ],
+                  ),
+                ),
+                MoneyDisplay(o.safeToSpendCents, fontSize: 18, colorize: true),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _monthStatus(context, o, allPaid),
+        ],
+      ),
+    );
+  }
+
+  Widget _overviewMetric(
+    BuildContext context,
+    String label,
+    int cents,
+    Color color, {
+    required IconData icon,
+    String? subtitle,
+  }) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: t.bodySmall),
+            ],
+          ),
+          const SizedBox(height: 4),
+          MoneyDisplay(cents, fontSize: 16, color: color),
+          if (subtitle != null)
+            Text(subtitle, style: t.bodySmall?.copyWith(fontSize: 10.5)),
+        ],
+      ),
+    );
+  }
+
+  /// Faixa de status das contas do mês.
+  Widget _monthStatus(BuildContext context, MonthOverview o, bool allPaid) {
+    final t = Theme.of(context).textTheme;
+    String message;
+    Color color;
+    IconData icon;
+    if (!_isCurrentMonth) {
+      final closed = o.resultCents >= 0;
+      color = closed ? AppColors.positive : AppColors.warning;
+      icon = closed ? Icons.check_circle_outline : Icons.info_outline;
+      message = closed
+          ? 'Mês fechado com resultado de ${Money.format(o.resultCents)}.'
+          : 'Mês fechado com resultado de ${Money.format(o.resultCents)}.';
+    } else if (allPaid && o.hasBills) {
+      color = AppColors.positive;
+      icon = Icons.check_circle;
+      message = 'Você já pagou todas as contas deste mês! 🎉';
+    } else if (o.pendingBillsCount > 0) {
+      color = AppColors.warning;
+      icon = Icons.event_available_outlined;
+      message =
+          'Falta você pagar ${o.pendingBillsCount} conta${o.pendingBillsCount > 1 ? 's' : ''} '
+          '• ${Money.format(o.expensePendingCents)}';
+    } else {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: t.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   /// Seção de previsões (ocorrências futuras de recorrências).
   Widget _forecastSection(BuildContext context, List<_Forecast> items) {
@@ -254,7 +528,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   size: 18, color: AppColors.info),
               const SizedBox(width: 8),
               Text(
-                'Previsões (próximos 90 dias)',
+                'Ainda este mês (recorrências)',
                 style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
@@ -267,7 +541,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ],
           ),
           Text(
-            'Valores ainda não lançados, gerados pelas suas recorrências.',
+            'Ocorrências das suas recorrências ainda não lançadas. '
+            'Toque em pagar/receber para confirmar.',
             style: t.bodySmall,
           ),
           const SizedBox(height: 10),
@@ -341,6 +616,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         ),
                         MoneyDisplay(items[j].amountCents,
                             fontSize: 14, colorize: true, signed: true),
+                        const SizedBox(width: 6),
+                        _forecastAction(context, items[j]),
                       ],
                     ),
                   ),
@@ -350,6 +627,33 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Ação de confirmar (pagar/receber) uma ocorrência de recorrência.
+  Widget _forecastAction(BuildContext context, _Forecast f) {
+    return FilledButton.tonal(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      onPressed: () => _confirmForecast(f),
+      child: Text(f.isIncome ? 'Receber' : 'Pagar'),
+    );
+  }
+
+  Future<void> _confirmForecast(_Forecast f) async {
+    final c = context.read<AppController>();
+    final messenger = ScaffoldMessenger.of(context);
+    await c.payRecurrence(f.rule, date: f.date, paid: true);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(f.isIncome
+            ? '${f.label} confirmado como recebido.'
+            : '${f.label} marcado como pago.'),
       ),
     );
   }

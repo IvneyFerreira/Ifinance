@@ -945,6 +945,55 @@ class AppController extends ChangeNotifier {
     await saveTransaction(tx);
   }
 
+  /// Lança (materializa) uma ocorrência de recorrência como movimentação REAL.
+  ///
+  /// Permite "dar o flag de paga/recebida" em uma previsão de recorrência sem
+  /// duplicar valores: a ocorrência é criada UMA vez, já vinculada à regra
+  /// ([Transaction.recurringRuleId]) e marcada conforme [paid] — assim o motor
+  /// para de exibi-la como previsão e passa a contá-la como lançamento real.
+  Future<void> payRecurrence(
+    RecurringRule rule, {
+    required DateTime date,
+    bool paid = true,
+  }) async {
+    final now = DateTime.now();
+    final d = DateHelpers.dateOnly(date);
+    final onCard = rule.creditCardId != null;
+    // Se o usuário já lançou algo equivalente, não duplica.
+    final already = transactions.any((t) =>
+        !t.deleted &&
+        t.recurringRuleId == rule.id &&
+        DateHelpers.isSameMonth(t.competenceDate, d));
+    if (already) return;
+
+    final isIncome = rule.type == TransactionType.income;
+    final effectivePaid = paid && !onCard; // compra no cartão não "paga" a conta
+    final tx = Transaction(
+      id: repo.newId(),
+      userId: _user!.id,
+      accountId: onCard ? null : rule.accountId,
+      categoryId: rule.categoryId,
+      creditCardId: rule.creditCardId,
+      type: rule.type,
+      description: rule.description,
+      amountCents: rule.amountCents,
+      competenceDate: d,
+      dueDate: d,
+      paidAt: effectivePaid ? now : null,
+      expenseStatus: isIncome
+          ? ExpenseStatus.pending
+          : (effectivePaid ? ExpenseStatus.paid : ExpenseStatus.pending),
+      incomeStatus: isIncome
+          ? (effectivePaid ? IncomeStatus.received : IncomeStatus.expected)
+          : IncomeStatus.expected,
+      paymentMethod: onCard ? PaymentMethod.credit : PaymentMethod.other,
+      recurringRuleId: rule.id,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await saveTransaction(tx);
+  }
+
   /// Transferência entre contas próprias (cap. 17): duas movimentações
   /// vinculadas, impacto zero no resultado consolidado.
   Future<void> addTransfer({
